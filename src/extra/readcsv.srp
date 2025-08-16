@@ -1,0 +1,154 @@
+# this code is designed to read a small database from Excel
+#
+# the input file format is csv -- each line is a row, each column is
+# separated by a comma, each field, if it starts with a quote, is a 
+# quoted string with double quotes escaped by double quotes, e.g. 
+# "this is a ""quoted string"", ok?" is one field containing 2 double quotes
+#
+# result = readcsv("filename.csv", dictionary_flag [, trim_flag]) 
+# reads and returns an array of rows, where each row is an array of fields
+#
+# If trim_flag is true, each field is trimmed of leading and trailing whitespace.
+#
+# If dictionary_flag is true, then the first row (1) must contain symbol names.
+# The return value is an array starting with row 2 at index zero. The rows
+# are dictionaries with the symbol names as keys for each entry. The symbols
+# are converted to lower case, e.g. if row 1 contains "Name", the corresponding
+# key will be 'name', and spaces are replaced with underscores, e.g. if row 1
+# contains "Edu Type", the key will be 'edu_type'. Finally, duplicate keys are
+# renamed with suffixes _1, _2, _3, etc., e.g. if there are two columns with 
+# row 1 containing "address", the keys will be 'address_1' and 'address_2'. 
+# (But if there is already a key named 'address_1' or 'address_2', the final key
+# names will be unique, but might not be intuitive.)
+#
+# If dictionary_flag is true, the global readcsv_labels will be set to the keys
+# from the headers in the original column order.
+#
+# If the file cannot be opened nil is returned. If there is an error, 
+# the error string is returned.
+#
+
+require "strparse"
+max_line_len = 16000
+
+def multiline_field(prefix, inf)
+    var line = inf.readline(max_line_len)
+    if not line
+        print "error after " + prefix + " --- close quote expected but got eof"
+        return nil
+    var p = String_parse("\"" + line)
+    var s = p.get_nonspace_quoted(t)
+    if s.last() == "\""
+        return [p, prefix + subseq(s, 1, -1)]
+    else
+        return multiline_field(prefix + subseq(s, 1), inf)
+
+
+def trim(s):
+    while len(s) > 0 and isspace(s[0]):
+        s = subseq(s, 1)
+    while len(s) > 0 and isspace(s[len(s) - 1]):
+        s = subseq(s, 0, -1)
+    return s
+
+
+def make_key(labels, i):
+    # replace spaces with underscores and upper case with lower case
+    # then convert string to symbol with intern()
+    var s = labels[i]
+    s = tolower(s)
+    var j = find(s, " ")
+    while j > -1
+        s = subseq(s, 0, j) + "_" + subseq(s, j + 1)
+        j = find(s, " ")
+    # if there are two instances of the key, make new names
+    var k = intern(s)
+    var loc = labels.index(k)
+    if loc > -1
+        labels[loc] = intern(str(labels[loc]) + "_1")
+
+    # if there were duplicates of this name, an existing name will 
+    # have the suffix "_1". If you find it, use a unique suffix.
+    var k1 = intern(s + "_1")
+    loc = labels.index(k1)
+    if loc > -1
+        // append _n for n = 2, 3, ... until unused name found
+        var n = 2
+        k = intern(s + "_" + str(n))
+        loc = labels.index(k)
+        while loc > -1
+            n = n + 1
+            k = intern(s + "_" + str(n))
+            loc = labels.index(k)
+    labels[i] = k
+
+
+def readcsv(filename, dictionary_flag, optional trim_flag = false)
+    var inf = open(filename, "r")
+    if not inf
+        return nil
+    var line = inf.readline(max_line_len)
+    var rows = []
+    var fields = []
+    var delim // remember the last delimiter found, if any
+    while line
+        var p = String_parse(line)
+        var field
+        // if the next character is a double quote, then read the quoted
+        // string. Otherwise, scan to comma or end of line. Due to MS Excel
+        // stupidity, the last field can be empty but implied by a trailing
+        // comma, which is retained in delim. This is stupid because if there
+        // *is* a newline just before EOF, does that mean there's an implied
+        // empty field on the next line? Actually, CSV itself is poorly
+        // thought out: how do you distinguish between zero fields and one
+        // empty field?
+        while (p.remaining_len() > 0) or (delim == ","):
+            var c = p.peek()
+            if c == "\""
+                field = p.get_nonspace_quoted(t)
+                if field.last() != "\""
+                    // string is not closed yet, read another line
+                    var p_field = multiline_field(subseq(field, 1), inf)
+                    if not p_field                    
+                        return
+                    p = p_field[0]
+                    field = p_field[1]
+                else
+                    field = subseq(field, 1, -1) // trim the quotes
+                delim = p.get_char() // skip past comma or newline
+            else
+                field = p.get_delimited(",")
+                delim = field.last()
+                # MS Excel does not end last row with end-of-line!
+                # This results in delim == nil (o.w. it is "," or "\n")
+                # so we have a special case to avoid trimming field that's
+                # terminated by EOF:
+                if delim == "," or delim == "\n"
+                    field = subseq(field, 0, -1) // trim the comma or newline
+                    if field.last() == "\r": // note: "".last() is nil
+                        field = subseq(field, 0, -1) // trim CR in case of CRLF
+                    // note that ANY field ending in CR will be modified,
+                    //    whether or not it is part of a CRLF sequence
+            fields.append(trim(field) if trim_flag else field)
+        rows.append(fields)
+        fields = []
+        line = inf.readline(max_line_len)
+    // now, convert if dictionary_flag is set
+    if dictionary_flag
+        if len(rows) < 1
+            return "Could not even read one row with labels from " + filename
+        // get symbols from first row      
+        readcsv_labels = rows[0]
+        for label at i in readcsv_labels
+            readcsv_labels[i] = make_key(readcsv_labels, i)
+        // make dictionaries from remaining rows
+        for i = 1 to len(rows)
+            var dict = {}
+            var row = rows[i]
+            for label at j in readcsv_labels
+                if j < len(row)
+                    dict[label] = row[j]
+            rows[i - 1] = dict
+        rows.unappend() // we have one less row now
+    return rows
+

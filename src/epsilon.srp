@@ -1,0 +1,81 @@
+# epsilon.srp -- determine epsilon to use at a given time
+#
+# Roger B. Dannenberg
+
+# A label file can set and change epsilon to use during score
+# following. Epsilon is the minimum IOI to start a new chord
+# (or Cevent).
+#
+# Call epsilon_init(labels) to initialize this module
+# or when a new score is read.
+#
+# After reading a note at some time from the score, call
+# get_epsilon(time) to get the current value for epsilon.
+
+class Epsilon_change:
+    var time
+    var epsilon
+
+    def init(x, y):
+        time = x
+        epsilon = y
+
+    def to_str():
+        "<Epsilon_change " + str(time) + str(epsilon) + ">"
+
+
+
+def epsilon_init(labels):
+    epsilon_changes = []
+    eps_epsilon = 0.075
+    if not labels:
+        return
+    for label in labels:
+        if label.command == 'epsilon':
+            epsilon_changes.append(
+                    Epsilon_change(label.start, label.data[0] / 1000))
+    print "Found", len(epsilon_changes), "epsilon changes in labels"
+    eps_index = 0
+    get_epsilon(0)  // allows label at time 0 to set initial epsilon
+
+
+def get_epsilon(time):
+    while eps_index < len(epsilon_changes) and
+       time >= epsilon_changes[eps_index].time:
+        eps_epsilon = epsilon_changes[eps_index].epsilon
+        eps_index = eps_index + 1
+    return eps_epsilon
+
+
+def compute_epsilon_hint(strack):
+    // compute epsilon for cevt grouping - if score note gaps are
+    // mostly zero, then this is probably a symbolic score where
+    // chord notes are perfectly aligned, and we set epsilon very 
+    // small. This fixes the case where the score tempo is very
+    // fast and very fast passages have notes shorter than the
+    // default epsilon == 0.075 sec.
+    var score_interval_hist = Histogram(0, 76, 2, true)
+    var prev_time
+    for note in strack:
+        if isinstance(note, Alg_note):
+            if prev_time:
+                var interval = (note.time - prev_time) * 1000
+                score_interval_hist.increment(interval)
+                if interval > 5 and interval < 25:
+                    print "Score time interval", interval,
+                    print     "msec after score time", prev_time
+            prev_time = note.time
+    print "\nSCORE TIME INTERVAL HISTOGRAM IN MILLISECONDS"
+    score_interval_hist.show()
+    print
+    var result = nil
+    if score_interval_hist.counts[0] + score_interval_hist.counts[1] >
+       idiv(len(strack), 4):   // more than 25% of IOIs are < 4 msec
+        print "------------------------"
+        print "Chords in score seem to be perfectly aligned."
+        result = Aud_label(0, 0, 'epsilon', ["50"])
+        print "Consider making epsilon shorter than the default 75 msec."
+        print "------------------------"
+    return result
+    
+

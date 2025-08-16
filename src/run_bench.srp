@@ -1,0 +1,257 @@
+# run_bench.srp
+#
+# Purpose: Runs batch score following benchmark tests using the ASAP dataset.
+#          Reads test cases from metadata, runs each test using the common
+#          test function, and outputs results to a CSV file.
+
+LOG_ROGER = false
+LOG1 = false
+LOG2 = false
+LOG3 = false
+TOPX = 50
+NOHINTS_MODE = false
+
+require "cmdline"
+require "strparse"
+require "readcsv"
+require "writecsv"
+require "allegro"
+require "mfread"
+require "test_common"
+
+
+# Switch between v17 and v18 score_follower
+#
+# require "score_follower_v17"
+require "score_follower_v18_trill"
+
+# Switch between static and dynamic strategy
+#
+# STRATEGY = 'static'
+STRATEGY = 'dynamic'
+
+ASAP_PATH = "../../asap-dataset-master/"
+RESULT_PATH = "../tests/bench_result.csv"
+ERROR_HIST_PATH = "../tests/error_histogram.data.csv"
+GAP_HIST_PATH = "../tests/large_gaps_between_matches.csv"
+MIDI_PATH = "../tests/midi/"
+ASAP_META = "metadata.csv"
+
+
+def find_trills_finish_score(hints, path, strack):
+    sort_labels(hints)
+    var epsilon_label = compute_epsilon_hint(strack)
+    if epsilon_label:
+        hints.insert(0, epsilon_label)
+
+    // write the hints:
+    if len(hints) > 0:
+        path = score_path_to_labels_path(path)
+        // now, path looks like "../sfhints/<x>/<y>/<something>_labels.txt"
+        // and we want "../sfhints/<x>/<y>/trill_finder_labels.txt" to avoid
+        // overwriting something created or corrected by hand
+        path = file_name_from_path(path, true)  // true to get path, not file
+        var err = nil
+        if not isdir(path):
+            print "Creating missing path", path
+            err = file_make_path(path)
+        if isstring(err):
+            print err
+        else:
+            path = path + "trill_finder_labels.txt"
+            if not write_labels(path, hints):
+                print "Wrote score following hints (epsilon, trills, ...) to",
+                print     path
+    else:
+        print "No score following hints to suggest."
+
+
+# Runs a specified range of benchmark tests using the ASAP dataset.
+# Reads metadata, calls run_test() for each selected test case using the
+# given strategy, and writes aggregated results to a CSV file.
+#
+def run_bench(strategy, startno, endno):
+
+    asap_meta_path = strcat(ASAP_PATH, ASAP_META)
+    asap = readcsv(asap_meta_path, true) 
+    display "ASAP test count", len(asap)
+    if LIST_MODE:
+        print
+
+    var hints  // will hold labels if FIND_TRILLS is true
+    var strack  // score notes
+    var spwl    // mapping from score time to beats
+    var results = []
+    var error_hist_results = []
+    var gap_hist_results = [] 
+    var prev_score_path = ""  // used to iterate through scores vs performances
+    # startno == 1 corresponds to row 0 and we process through endno:
+    for test_no = startno to endno + 1:
+        var row = asap[test_no - 1]
+        var score_path = strcat(ASAP_PATH, row.get('midi_score'))
+        var perf_path = strcat(ASAP_PATH, row.get('midi_performance'))
+        var error_label_path = get_label_file_path(score_path, "large_error_labels.txt")
+        var gap_label_path = get_label_file_path(score_path, "large_gap_labels.txt")
+
+        if LIST_MODE:
+            if prev_score_path != score_path:
+                print score_path
+                prev_score_path = score_path
+            print leftpad(str(test_no), 6), perf_path
+        elif FIND_TRILLS:  // builds labels file for score_path
+            print "===== ROW #"; test_no, "====="
+            if prev_score_path != "" and prev_score_path != score_path:
+                find_trills_finish_score(hints, prev_score_path, strack)
+                prev_score_path = ""
+            // see if we are starting to process score_path:
+            if prev_score_path == "":
+                // get labels from score 1st time this piece is seen
+                var slabels = get_labels(score_path)
+                var sseq = allegro_smf_read(score_path)
+                strack = extract_track("  Score MIDI", sseq)
+                spwl = labels_to_pwl(slabels)
+                hints = trill_finder(strack)
+                prev_score_path = score_path
+            // now if we're processing performances (including the first one)
+            // of score_path, get new trills if any and merge them with hints
+            if score_path == prev_score_path:
+                estimate_labels(hints, spwl, perf_path, asap, test_no - 1)
+                prev_score_path = score_path
+        else:  // normal behavior: simulate accompaniment
+            print "===== ROW #"; test_no, "====="
+            var result = run_test(score_path, perf_path, strategy)
+            if result != nil:
+                var row_data = row.copy()
+                row_data['no'] = test_no
+                row_data['note_count'] = result.total_count
+                row_data['matched_note_count'] = result.matched_note_count
+                row_data['expected_note_count'] = result.expected_note_count
+                row_data['matched_percent'] = result.matched_percent
+                row_data['midi_score'] = score_path
+                row_data['midi_performance'] = perf_path
+                results.append(row_data)
+                result.compute_gap_histogram(true, gap_hist_results, test_no, gap_label_path)
+                // overwrite result csv after every test
+                result_keys = ['no', 'composer', 'title', 'note_count', 'matched_note_count',
+                            'expected_note_count', 'matched_percent', 'midi_score', 'midi_performance']
+                // Output results to csv
+                print "writing", len(results), "results to", RESULT_PATH
+                writecsv(results, RESULT_PATH, result_keys)  
+            if ERROR_MILLIBEATS:
+                result.compute_error_histogram(true, error_hist_results, test_no, error_label_path)
+            if WARPED_PATH:
+                result.write_warped_performance(WARPED_PATH,
+                                                result.sseq, result.pseq)
+    if FIND_TRILLS:
+        // labels for the last score encountered have not been written:
+        find_trills_finish_score(hints, prev_score_path, strack)
+    elif LIST_MODE:
+        print
+
+
+# ASAP start and end test no to run
+#
+STARTNO = 1
+ENDNO = 10
+
+def help():
+    print "run_bench - main program for evaluating score following algorithms"
+    print "usage: serpent64 run_bench [start] [end]"
+    print "   or: serpent64 run_bench score_path perf_path"
+    print "    start and end are line numbers in", ASAP_PATH; ASAP_META
+    print "    and score_path and perf_path are paths to files"
+    print "options are:"
+    print "   -h --help: print this help text"
+    print "   -e --error <millibeats>: print information on matches that"
+    print "           differ from estimated correct score time by more"
+    print "           than <millibeats>"
+    print "   -g --gap <beats>: print score and performance times for the"
+    print "           matching notes before any gap of at least <beats>"
+    print "           This is used to find places where failure to match"
+    print "           causes significant time to pass without any information"
+    print "           about performance location or tempo. In any case, a"
+    print "           histogram of gaps is created to show the size and"
+    print "           frequency of gaps between matches."
+    print "   -w --warped <path>: write a copy of the performance MIDI file"
+    print "           warped to the timing of the score file"
+    print "   -1 --LOG1: set LOG1 to true (prints debugging information)"
+    print "   -2 --LOG2: sets LOG1 and LOG2 to true (prints debugging"
+    print "           information)"
+    print "   -m --matrix <time> <window>: prints the match matrix starting"
+    print "           <window> (an integer) events before <time> (a score"
+    print "           time in seconds) and ending <window> events after."
+    print "           Full matrix is also written to matrix.txt"
+    print "   -c --cevents <time1> <time2>: print Cevents between <time1> and"
+    print "           <time2> to show normal, trill and grace note pitches."
+    print "   -s --showskips: print details of short notes that are ignored in"
+    print "           forming Cevents; otherwise, just print warning and count."
+    print "   -n --nohints: ignore hints from labels files generated by"
+    print "            trillfinder"
+    print " SPECIAL COMMANDS - NOT SCORE FOLLOWING SIMULATION"
+    print "   -t --trill: instead of running score following algorithms,"
+    print "           run trillfinder and produce labels file. If the score"
+    print "           is given by name rather than by ID number, only the"
+    print "           score file is analyzed to find trills.  Otherwise, all"
+    print "           performances are also analyzed because sometimes trills"
+    print "           are improvised or maybe different in other scores."
+    print "   -l --list: list the metadata for the piece starting at start,"
+    print "           which must be an ID. This useful to choose start and"
+    print "           end IDs."
+
+
+def main_start():
+    cmdline = Cmdline()
+    if len(command_line_arguments) < 2 or cmdline.get_option(["-h", "--help"]):
+        help()
+        return
+        
+    var n = cmdline.get_named(["-e", "--error"])
+    ERROR_MILLIBEATS = cmdline.need_int(n, nil)
+    n = cmdline.get_named(["-g", "--gap"])
+    GAP_BEATS = cmdline.need_int(n, nil)
+    WARPED_PATH = cmdline.get_named(["-w", "--warped"])
+    FIND_TRILLS = cmdline.get_option(["-t", "--trill"])
+    LOG2 = cmdline.get_option(["-2", "--LOG2"])
+    LOG1 = LOG2 or cmdline.get_option(["-1", "--LOG1"])
+    LIST_MODE = cmdline.get_option(["-l", "--list"])
+    NOHINTS_MODE = cmdline.get_option(["-n", "--nohints"])
+    var matrix_option = cmdline.get_named(["-m", "--matrix"], n = 2, [nil, nil])
+    MATRIX_PRINT = cmdline.need_real(matrix_option[0], nil)
+    MATRIX_WIDTH = cmdline.need_int(matrix_option[1], 5)
+    var cevents_option = cmdline.get_named(["-c", "--cevents"], n = 2, [nil, nil])
+    CEVENTS_PRINT = cmdline.need_real(cevents_option[0], nil)
+    CEVENTS_END_TIME = cmdline.need_real(cevents_option[1], 0.0)
+    SHOW_SKIPS = cmdline.get_option(["-s", "--showskips"])
+    if LOG1:
+        print "LOG1 enabled"
+    if LOG2:
+        print "LOG2 enabled"
+    if NOHINTS_MODE:
+        print "NOHINTS_MODE enabled: Hints from labels files will be ignored."
+    var p1 = cmdline.get_posn(1, 'prompt', "start index or midi score")
+    if len(p1) > 0 and isdigit(p1[0]):
+        STARTNO = cmdline.need_int(p1)
+        ENDNO = cmdline.get_posn(2, p1)
+        ENDNO = cmdline.need_int(ENDNO)
+        print "Running score-following simulation from ID", STARTNO, "to", ENDNO
+        run_bench(STRATEGY, STARTNO, ENDNO)
+    elif len(p1) > 0:  // p1 is a path rather than an ID number
+        score_path = p1
+        if LIST_MODE:
+            print "WARNING: -l and --list only work when ID number(s) provided."
+        elif FIND_TRILLS:  // get trills from just midi score
+            estimate_labels(score_path)
+        else:  // run one simulation on score_path and perf_path
+            perf_path = cmdline.get_posn(2, 'prompt', "midi performance")
+            var result = run_test(score_path, perf_path, STRATEGY)
+            if ERROR_MILLIBEATS:
+                result.compute_error_histogram(true, [], 1)
+            if GAP_BEATS:
+                result.compute_gap_histogram(true, [], 1)
+    cmdline.report_unused()
+
+
+main_start()
+exit()
+
+

@@ -1,0 +1,69 @@
+[
+  {
+    "label_start": 0.0,
+    "label_end": 0.0,
+    "label_text": "epsilon 50",
+    "checks": {
+      "text_valid": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 0.000-0.000 epsilon 50",
+      "Skipped: text does not contain 'trill'"
+    ],
+    "approx_start_measure": 0,
+    "approx_end_measure": 0
+  },
+  {
+    "label_start": 152.406,
+    "label_end": 153.73,
+    "label_text": "trill 79",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 152.406-153.730 trill 79",
+      "Filtered notes: 20, original count: 30",
+      "Unique pitches after filter: 10",
+      "Rejected: heuristics failed",
+      "Rejected: heuristics indicate region is not a trill"
+    ],
+    "approx_start_measure": 54,
+    "approx_end_measure": 54,
+    "expanded_start": 152.26600000000002,
+    "expanded_end": 153.8458206541667,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "case1_single_pitch": false
+      },
+      "filtered_note_count": 20,
+      "unique_pitches": 10,
+      "pitch_counts": {
+        "75": 4,
+        "70": 3,
+        "67": 3,
+        "63": 2,
+        "58": 2,
+        "55": 2,
+        "51": 1,
+        "46": 1,
+        "43": 1,
+        "39": 1
+      },
+      "pair": [
+        75,
+        70
+      ],
+      "pair_count": 7,
+      "semitone_apart": false
+    }
+  }
+]

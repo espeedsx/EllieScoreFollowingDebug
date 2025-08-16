@@ -1,0 +1,38 @@
+can epsilon change with performance? It's possible but not implemented. At
+    least for dynamic matcher, the time window is probably fairly large
+    so epsilon does not need to be tuned carefully.
+
+May 24: trillfinder.srp does a fair job of finding potential trills. Sometimes,
+performers play trills that are not in the score.
+
+Currently, trillfinder is run in test_common.srp, but we really should make a
+separate program that looks at ALL pieces. For every piece, look at ALL
+performances and build trill annotations (labels) for all the trills. (There is
+no penalty for not playing a trill, but there is a penalty for playing trill
+notes that are not matched to annotated trills.)
+
+Then, the program should output a label file. These all have to be manually
+checked and adjusted, so they should be written to something like 
+"trill_finder_labels.txt" whereas the human-edited version will be
+"midi_score_labels.txt".
+
+Finally, there was at least one example where a trill had 4 repetitions of
+one pitch, but the other was played only 3 times, so it was not detected.
+When we get overlapping runs of rapidly repeated notes (part 2 of trill
+finding), we should check that the pitches are within 1 or 2 semitones.
+Otherwise, it is not a trill. Then, if we end up with repeated notes from
+t1 to t2 that have no 2nd pitch (no overlap with another repeated pitch),
+we should look in the score over a time period that starts 125 msec before
+and ends 125 msec after. Search for pitches at +1, +2, -1 and -2. If you
+find at least 2 pitches within 250 msec, add that pitch as the 2nd pitch
+of the trill. (If there is more than one candidate, pick the one with the
+most pitches -- it should be 3 at the most since it was not detected
+in the initial pass that looks for runs of 4 pitches.) If there are 2 or
+more candidates with 3 pitches, include them all and print a warning message.
+
+Currently, I put labels in with the asap database files, but they are not
+part of asap, so they should be in a a parallel directory structure and
+stored on github.  We can tell github to exclude trill_finder_labels.txt
+files since these are machine generated.
+
+

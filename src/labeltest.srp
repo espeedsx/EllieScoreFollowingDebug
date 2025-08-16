@@ -1,0 +1,22 @@
+# labeltest.srp - test program for labels
+#
+# Roger B. Dannenberg
+# May 2025
+
+require "debug"
+require "labels"
+
+
+def main():
+    labels = read_labels("labeltest.txt")
+    for label in labels:
+        if not isreal(label.start):
+            print "bad start", type(label.start)
+        if not isreal(label.stop):
+            print "bad stop", type(label.stop)
+        if not isstring(label.label):
+            print "bad label field", type(label.label)
+        print label
+
+    
+main()

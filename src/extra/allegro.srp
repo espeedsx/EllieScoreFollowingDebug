@@ -1,0 +1,2004 @@
+// allegro.srp -- an ascii music representation
+
+alg_eps = 0.00001 // epsilon = 10 microseconds or 10 microbeats
+
+// basic object has the following fields:
+//
+// channel
+// time
+//
+// note object adds:
+// pitch
+// duration
+// 
+// update object adds:
+// 
+class Alg_event:
+    var time
+    var chan
+
+    def show():
+        print to_string()
+
+
+def event_greater_than(e1, e2):
+    e1.time > e2.time
+
+def event_less_than(e1, e2):
+    e1.time < e2.time
+
+
+ALG_NOTE = 0             // type codes for use with event_type_mask in find_events_in_range
+ALG_GATE = 1 // "gate"
+ALG_BEND = 2 // "bend"
+ALG_CONTROL = 3 // "control"
+ALG_PROGRAM = 4 // "program"
+ALG_PRESSURE = 5 // "pressure"
+ALG_KEYSIG = 6 // "keysig"
+ALG_TIMESIG_NUM = 7 // "timesig_num"
+ALG_TIMESIG_DEN = 8 // "timesig_den"
+ALG_OTHER = 9 // any other value
+
+event_type_code_map = {'gater' : ALG_GATE, 'bendr' : ALG_BEND,
+                 'programi' : ALG_PROGRAM,
+                 'pressurer' : ALG_PRESSURE, 'keysigi' : ALG_KEYSIG,
+                 'timesig_numi' : ALG_TIMESIG_NUM,
+                 'timesig_deni' : ALG_TIMESIG_DEN}
+
+class Alg_note (Alg_event):
+    // inherit time and chan
+    var dur
+    var key
+    var pitch
+    var loud
+    var attributes  // a dictionary of names->values
+
+    def init(optional time_, chan_, key_, pitch_, loud_, dur_)
+        time = time_
+        chan = chan_
+        key = key_
+        pitch = pitch_
+        loud = loud_
+        dur = dur_
+
+    def copy():
+        var n = Alg_note(time, chan, key, pitch, loud, dur)
+        if attributes:
+            n.attributes = attributes.copy()
+        return n
+
+    def to_str():
+        "Alg_note@" + hex(hash(this))
+
+    def to_string():
+        flatten(["Alg_note: time ", str(time),
+                 " chan ", str(chan),
+                 " dur ", str(dur),
+                 " key ", str(key),
+                 " pitch ", str(pitch),
+                 " loud ", str(loud),
+                 " attributes ", str(attributes)])
+
+    def to_string_csv():
+        flatten([str(time), // time
+                 ", ", str(chan), // chan
+                 ", ", str(dur), // dir
+                 ", ", str(key), // key
+                 ", ", str(pitch), // pitch
+                 ", ", str(loud), // loud
+                 ", ", str(attributes)]) // attributes
+
+    def overlap(start, len, all):
+        inrange(time, start, start + len - alg_eps) or
+            (all and (time < start and time + dur - alg_eps > start))
+
+    def get_type_code() // for use with event_type_mask in find_events_in_range
+        ALG_NOTE
+
+    def get_end_time()
+        time + dur
+
+
+class Alg_update (Alg_event):
+    // inherit time and chan
+    var key
+    var attribute
+    var value
+
+    def init(optional time_, chan_, key_, attribute_, value_):
+        time = time_
+        chan = chan_
+        key = key_
+        attribute = attribute_
+        value = value_
+
+    def copy():
+        return Alg_update(time, chan, key, attribute, value)
+
+    def to_string():
+        flatten(["Alg_update: time ", str(time),
+                 " chan ", str(chan), " key ",  str(key),
+                 " attr ", str(attribute), " val ", str(value)])
+
+    def overlap(start, len, all)
+        inrange(time, start, start + len - alg_eps)
+
+    def get_type_code() // for use with event_type_mask in find_events_in_range
+        // control is a special case because control attributes are of the form
+        // 'control23r', e.g. 'control8r' is the midi balance control change
+        if subseq(str(attribute), 0, 7) == "control" and
+            type(value) == 'Real':
+            return ALG_CONTROL
+        event_type_code_map.get(attribute, ALG_OTHER)
+
+    def get_end_time()
+        time
+
+
+class Alg_beat:
+    # Alg_beat is a (time, beat) pair in a piece-wise linear mapping
+    var time  // in units of seconds
+    var beat  // zero-based beat
+
+    def init(t, b):
+        time = t
+        beat = b
+
+
+class Alg_time_map:
+    var beats // array of Alg_beat; beats are 0-based, starting with (0, 0)
+    var last_tempo // Real or NIL, beats per second
+
+    def init(optional bpm = 100.0):
+        beats = [Alg_beat(0.0, 0.0)] // initial beat
+        last_tempo = bpm / 60.0 // 100 bpm default
+
+    def locate_time(time):
+        # find the insertion index for a 0-based beat at time in seconds
+        var i = 0
+        while i < len(beats) and time > beats[i].time:
+            i = i + 1
+        return i
+
+    def locate_beat(beat):
+    # find the insertion index for a beat; equivalent to find the first
+    # map entry such that entry.beat is > beat, or if beat is greater
+    # than beats of all entries, return the length of beats.
+        var i = 0
+        while i < len(beats) and beat > beats[i].beat:
+            i = i + 1
+        return i
+
+    def beat_to_time(beat):
+        if beat <= 0:
+            return beat
+        var i = locate_beat(beat)
+        if i == len(beats):
+            // special case: beat >= than last time,beat pair
+            // so extrapolate using last_tempo
+            if last_tempo:
+                return beats[i - 1].time + (beat - beats[i - 1].beat) * 
+                                           1.0 / last_tempo
+            elif i == 1: // only one time point and no last_tempo!
+                // assume a tempo of 100
+                return beat * 0.6 // (60sec/min / 100bpm)
+                //return beat
+            else: // extrapolate from last two time map entries
+                var mbi = beats[i - 2]
+                var mbi1 = beats[i - 1]
+        else: // interpolate between i - 1 and i
+            mbi = beats[i - 1]
+            mbi1 = beats[i]
+        // print "calc time of beat ", beat, " between (";
+        // print mbi.time, mbi.beat; ") and ("; mbi1.time, mbi1.beat; ")"
+        // whether we extrapolate or interpolate, the math is the same:
+        var time_dif = mbi1.time - mbi.time
+        var beat_dif = mbi1.beat - mbi.beat
+        mbi.time + (beat - mbi.beat) * time_dif / beat_dif
+
+    def beat_to_tempo(beat):
+        # what is the tempo in bpm at beat? If there is a tempo change here,
+        # use the tempo on the left (before the change)
+        return index_to_tempo(locate_beat(beat))
+
+    def index_to_tempo(i)
+    # return the tempo at entry i in tempo map in bpm -- the tempo is
+    # in effect JUST BEFORE entry i, where tempo might change. Typically,
+    # i is related to locate_beat(beat), so i refers to the first map entry
+    # BEYOND beat.
+        // two cases here: we're beyond the last entry, so
+        //   use last_tempo or extrapolate, OR
+        // there's only one entry, so use last_tempo or
+        //   return the default tempo
+        if i == len(beats) or len(beats) <= 1:
+            // special case: beat >= last time.beat pair
+            // so extrapolate using last_tempo if it is there
+            if last_tempo:
+                return last_tempo * 60.0
+            elif i <= 1: // only one time point and no last tempo!
+                // assume a tempo of 100
+                return 100.0 / 60.0
+            else // extrapolate from last two time map entries
+                var mbi = beats[i - 2]
+                var mbi1 = beats[i - 1]
+        elif i == 0
+            mbi = beats[0]
+            mbi1 = beats[1]
+        else
+            mbi = beats[i - 1]
+            mbi1 = beats[i]
+        var time_dif = mbi1.time - mbi.time
+        var beat_dif = mbi1.beat - mbi.beat
+        return beat_dif * 60.0 / time_dif
+
+    def time_to_beat(time):
+        if time <= 0:
+            return time
+        var i = locate_time(time)
+        var beat
+        if i == len(beats): // beat is beyond last time map entry
+            if last_tempo: // extrapolate beyond last time map entry
+                beat = beats[i - 1].beat + 
+                       (time - beats[i - 1].time) * last_tempo
+                return beat
+            elif i == 1: // only one time point and no last tempo!
+                beat = time * 100 / 60 // assume 100 bpm
+                return beat
+            else: // extrapolate from last two time map entries
+                var mbi = beats[i - 2]
+                var mbi1 = beats[i - 1]
+        else: // interpolate between the surrounding time map entries
+            mbi = beats[i - 1]
+            mbi1 = beats[i]
+        var time_dif = mbi1.time - mbi.time
+        var beat_dif = mbi1.beat - mbi.beat
+        beat = mbi.beat + (time - mbi.time) * beat_dif / time_dif
+        return beat
+
+
+    def trim(start, end, optional units_are_seconds = t):
+        # extract the time map from start to end and shift to time zero
+        # start and end are time in seconds if units_are_seconds is true
+        var i = 0 // index into beats
+        var start_index // index of first breakpoint after start
+        var count = 1
+        var initial_beat = start
+        var final_beat = end
+        if units_are_seconds:
+            initial_beat = time_to_beat(start)
+            final_beat = time_to_beat(end)
+        else
+            start = beat_to_time(initial_beat)
+            end = beat_to_time(final_beat)
+        while i < len(beats) and beats[i].time < start:
+            i = i + 1
+        // now i is index into beats of the first breakpoint after start
+        #if i >= len(beats):
+        #    return // only one 
+        // beats[0] is (0,0) and remains that way
+        // copy beats[start_index] to beats[1], etc.
+        // skip any beats at or near (start,initial_beat), using count
+        // to keep track of how many entries there are
+        start_index = i
+        while i < len(beats) and beats[i].time < end:
+            if beats[i].time - start > alg_eps and
+               beats[i].beat - initial_beat > alg_eps:
+                beats[i].time = beats[i].time - start
+                beats[i].beat = beats[i].beat - initial_beat
+                beats[i - start_index + 1] = beats[i]
+                count = count + 1
+            else:
+                start_index = start_index + 1
+            i = i + 1
+        // set last tempo data
+        // we last examined beats[i-1] and copied it to
+        //   beats[i - start_index]. Next tempo should come
+        //   from beats[i] and store in beats[i - start_index + 1]
+        // case 1: there is at least one breakpoint beyond end
+        //         => interpolate to put a breakpoint at end
+        // case 2: no more breakpoints => set last tempo data
+        if i < len(beats):
+            // we know beats[i].time >= end, so case 1 applies
+            beats[i - start_index + 1].time = end - start
+            beats[i - start_index + 1].beat = final_beat - initial_beat
+            last_tempo = false // extrapolate to get tempo
+            count = count + 1
+        // else we will just use stored last tempo (if any)
+        beats.set_len(count)
+
+    def cut(start, len, units_are_seconds):
+        # remove portion of time map from start to start + len, 
+        # shifting the tail left by len. start and len are in whatever
+        # units the score is in. If you cut the time_map as well as cut 
+        # the tracks of the sequence, then sequences will preserve the
+        # association between tempo changes and events
+        // display "before cut", start, len, units_are_seconds
+        show()
+        var end = start + len
+        var initial_beat = start
+        var final_beat = end
+        var i = 0
+
+        if units_are_seconds:
+            initial_beat = time_to_beat(start)
+            final_beat = time_to_beat(end)
+        else
+            start = beat_to_time(initial_beat)
+            end = beat_to_time(final_beat)
+            len = end - start
+        var beat_len = final_beat - initial_beat
+
+        while i < len(beats) and beats[i].time < start - alg_eps:
+            i = i + 1
+        // now i is index into beats of the first breakpoint on or 
+        // after start, insert (start, initial_beat) in map
+        // note: i may be beyond the last breakpoint, so beat[i] may
+        // be out of bounds
+        // display "after while", i, len(beats)
+        if i < len(beats) and within(beats[i].time, start, alg_eps)
+            // perterb time map slightly (within alg_eps) to place
+            // break point exactly at the start time
+            //display "reset", i
+            beats[i].time = start
+            beats[i].beat = initial_beat
+        else
+            //display "insert", i
+            var point = Alg_beat(start, initial_beat)
+            beats.insert(i, point)
+        // now, we are correct up to beats[i]. find first beat after
+        // end so we can start shifting from there
+        i = i + 1
+        var start_index = i
+        while i < len(beats) and beats[i].time < end + alg_eps:
+            i = i + 1
+        // now beats[i] is the next point to be included in beats
+        // but from i onward, we must shift by (-len, -beat_len)
+        while i < len(beats):
+            var b = beats[i]
+            b.time = b.time - len
+            b.beat = b.beat - beat_len
+            beats[start_index] = b
+            i = i + 1
+            start_index = start_index + 1
+        beats.set_len(start_index)
+        //print "after cut"
+        //show()
+
+
+    def copy():
+        var new_map = Alg_time_map()
+        new_map.beats = array(len(beats))
+        for i = 0 to len(beats):
+            new_map.beats[i] = Alg_beat(beats[i].time, beats[i].beat)
+        new_map.last_tempo = last_tempo
+        return new_map
+        
+        
+    def insert_time(start, len):
+        // find time,beat pair that determines tempo at start
+        // compute beat offset = (delta beat / delta time) * len
+        // add len,beat offset to each following Alg_beat
+        var i = locate_time(start) // start <= beats[i].time
+        if beats[i].time == start:
+            i = i + 1
+        if i > 0 and i < len(beats):
+            var beat_offset = len * (beats[i].beat - beats[i - 1].beat) /
+                                    (beats[i].time - beats[i - 1].time)
+            while i < len(beats):
+                beats[i].beat = beats[i].beat + beat_offset
+                beats[i].time = beats[i].time + len
+                i = i + 1
+
+
+    def insert_beats(start, len):
+        // find time,beat pair that determines tempo at start
+        // compute beat offset = (delta beat / delta time) * len
+        // add len,beat offset to each following Alg_beat
+        //print "time map before insert beats"
+        //show()
+        var i = locate_beat(start) // start <= beats[i].time
+        if beats[i].beat == start:
+            i = i + 1
+        if i > 0 and i < len(beats):
+            var time_offset = len * (beats[i].time - beats[i - 1].time) /
+                                    (beats[i].beat - beats[i - 1].beat)
+            while i < len(beats):
+                beats[i].time = beats[i].time + time_offset
+                beats[i].beat = beats[i].beat + len
+                i = i + 1
+        //print "time map after insert beats"
+        //show()
+
+
+    def show():
+        print "Alg_time_map: ";
+        for b in beats:
+            print "("; b.time; ", "; b.beat; ") ";
+        print "last tempo: "; last_tempo
+
+
+class Alg_time_sig:
+    var beat // when does this take effect?
+    var num  // what is the numerator?
+    var den  // what is the denominator?
+
+    def init(_beat, _num, _den):
+        beat = _beat
+        num = _num
+        den = _den
+
+    def to_string()
+        "<Alg_time_sig " + str(beat) + ": " + str(num) + "/" + str(den) + ">"
+
+    def show()
+        print this
+
+    def copy():
+        Alg_time_sig(beat, num, den)
+
+def time_sig_compare(a, b)
+    print "time_sig_compare", a, b, a.beat, b.beat
+    a.beat < b.beat
+
+
+class Alg_seq:
+    // TODO add write method that calls allegro_write
+    var tracks // array of array of notes
+    var map // a Alg_time_map
+    var time_sig // an array of time signatures or nil
+    var current  // used to iterate over tracks
+    var beat_x // beat index
+    var units_are_seconds
+    // these are used for cutting and inserting:
+    var real_dur // duration of sequence in seconds
+    var beat_dur // duration of sequence in beats
+    var track_index // the track index of the event
+                    // just returned by iteration_next()
+    var offset  // nil or real: an offset specified
+                // by #offset <real>
+
+    def time_sig_show(ts)
+        print "time sigs: ";
+        for s in ts:
+            s.show()
+
+    def init():
+        tracks = [[]] // one empty track created by default
+        map = Alg_time_map()
+        units_are_seconds = t
+        real_dur = 1.0
+        beat_dur = 1.0
+
+    def seek_time(time, track_num):
+        # find index of first score event after time
+        var notes = tracks[track_num]
+        for i = 0 to len(notes):
+            if notes[i].time > time:
+                return i
+        return i
+
+    def convert_to_beats():
+        # modify all times and durations in notes to beats
+        if units_are_seconds:
+            units_are_seconds = nil
+            for notes in tracks:
+                 for n in notes:
+                    var beat = map.time_to_beat(n.time)
+                    if isinstance(n, Alg_note):
+                        n.dur = map.time_to_beat(n.time + n.dur) - beat
+                    n.time = beat
+
+    def convert_to_seconds():
+        # modify all times and durations in notes to seconds
+        if not units_are_seconds:
+            units_are_seconds = t
+            for notes in tracks:
+                for n in notes:
+                    var time = map.beat_to_time(n.time)
+                    if isinstance(n, Alg_note):
+                        n.dur = map.beat_to_time(n.time + n.dur) - time
+                    n.time = time
+
+
+    def quarter_to_measure(beat):
+        # return [measure, beat, num, den]
+        var m = 0  // number of measures to previous time_sig change
+        var prev_beat = 0 // beat of previous time_sig change
+        var prev_num = 4  // numerator, previous time_sig change
+        var prev_den = 4  // denominator, previous time_sig change
+        var prev_bpm = 4  // beats per measure, previous time_sig change
+
+        if beat < 0: // negative measures are treated as zero
+            beat = 0
+
+        for ts in time_sig:
+            # if time_sig change is at or before beat, update m, etc.
+            if ts.beat <= beat:
+                m = m + int(0.99 + (ts.beat - prev_beat) / prev_bpm)
+                prev_num = ts.num
+                prev_den = ts.den
+                prev_bpm = prev_num * 4 / prev_den
+                prev_beat = ts.beat                
+            # if time_sig change is greater than beat, return
+            if ts.beat > beat
+                m = m + (beat - prev_beat) / prev_bpm
+                return [int(m), (m - int(m)) * prev_bpm,
+                        prev_num, prev_den]
+
+        // if we did not return yet, compute after last time signature
+        m = m + (beat - prev_beat) / prev_bpm
+        return [int(m), (m - int(m)) * prev_bpm,
+                prev_num, prev_den]
+
+
+    def measure_to_quarter(m):
+        # return quarters corresponding to (0-based integer) measure number
+        var prev_beat = 0  // beat of previous time_sig change
+        var prev_bpm = 4   // beats per measure of previous time_sig change
+        var prev_measure = 0  // measure number of previous time_sig_change
+        if m < 0:
+            return 0
+        for ts in time_sig:
+            var ts_beat_diff = ts.beat - prev_beat
+            var next_measure = prev_measure + ts_beat_diff / prev_bpm
+            if next_measure >= m:
+                var q = prev_beat + (m - prev_measure) * prev_bpm
+                return q
+            prev_measure = next_measure
+            prev_bpm = ts.num * 4 / ts.den
+            prev_beat = ts.beat
+        # if we did not return yet, compute beat from prev_beat
+        q = prev_beat + (m - prev_measure) * prev_bpm
+        return q
+
+
+    def insert_beat(time, beat):
+        # insert a time,beat pair
+        # return t or false (nil indicates an error, no update)
+        # it is an error to imply a negative tempo or to insert
+        # at a negative time
+        if time < 0 or beat < 0:
+            return false
+        if time == 0 and beat > 0:
+            time = alg_eps  // avoid infinite tempo, offset time by a bit
+        if time == 0 and beat == 0:
+            return t // (0, 0) is already in the map!
+        var units_should_be_seconds = units_are_seconds
+        convert_to_beats() // beats are invariant when changing tempo
+        var i = map.locate_time(time) // i is insertion point
+        var beats = map.beats
+        if i < len(beats) and within(beats[i].time, time, alg_eps):
+            // replace beat if time is already in the map
+            beats[i].beat = beat
+        else:
+            var point = Alg_beat(time, beat)
+            beats.insert(i, point)
+        // beats[i] contains new beat
+        // make sure we did not generate a zero tempo.
+        // if so, space beats by one alg_eps as necessary.
+        var j = i
+        while j < len(beats) and 
+            beats[j - 1].beat + alg_eps >= beats[j].beat:
+            beats[j].beat = beats[j - 1] + alg_eps
+            j = j + 1
+        if units_should_be_seconds:
+            convert_to_seconds()
+        return t
+
+    def time_map_paste(beat, dur, tm)
+        //print "time_map_paste", beat, dur, 
+        //tm.show()
+        //print "current map",
+        //map.show()
+        # insert a given time map at a given time and dur (in beats)
+        // this should already be in beats, but we will make sure here
+        convert_to_beats()
+        // this is here rather than in Alg_time_map because I want
+        // to call insert_beat, which is a member of Alg_seq
+        // First, insert a time,beat breakpoint at beat, the splice point
+        var time = map.beat_to_time(beat)
+        insert_beat(time, beat)
+        //print "after insert_beat"
+        //map.show()
+        // Note that we inserted a point that is on the tempo curve, e.g.
+        // at most we placed a point linearly interpolated between existing
+        // points or extrapolated beyond existing points
+        // Next, make a copy of tm so we can change what we want
+        tm = tm.copy()
+        // Locate the point at which dur occurs
+        var j = tm.locate_beat(dur)
+        var tm_end_time = tm.beat_to_time(dur)
+        //display "insert time", tm_end_time, dur
+        tm.beats.set_len(j) // we do not need any other points here
+        //display "tm.beats.set_len", j
+        //tm.show()
+        // Now find the point we inserted in map -- this is where we will add
+        var i = map.locate_beat(beat)
+        //display "after map.locate_beat", i
+        // we are almost ready to insert. Insertion will be more efficient if
+        // we insert at the end, so save map points from i+1 to the end:
+        var after_insert = subseq(map.beats, i)
+        map.beats.set_len(i) // truncate beats in preparation for appends
+        //print "map before appending anything"
+        //map.show()
+        for b in tm.beats:
+            b.time = b.time + time // shift by time
+            b.beat = b.beat + beat // and beat
+            map.beats.append(b)
+            //print "map after an append from insert"
+            //map.show()
+        // Now we can append points saved in after_insert
+        // These will need to be offset by tm_end_time - time and dur
+        for b in after_insert
+            //display "for b in after_insert", tm_end_time, dur, b.time, b.beat
+            b.time = b.time + tm_end_time
+            b.beat = b.beat + dur
+            map.beats.append(b)
+            //print "map after an append after the insert"
+            //map.show()
+
+
+    def insert_tempo(tempo, beat):
+        // print "insert_tempo("; tempo, beat; ") ";
+        tempo = tempo / 60.0 // convert to beats per second
+        # change the tempo at the given beat until the next beat event
+        if beat < 0:
+            return false
+        var units_should_be_seconds = units_are_seconds
+        convert_to_beats() // beats are invariant when changing tempo
+        var time = map.beat_to_time(beat)
+        var i = map.locate_time(time)
+        // print "time", time, type(time)
+        if i >= len(map.beats) or not within(map.beats[i].time, time, 0.000001):
+            insert_beat(time, beat)
+        // now i is index of beat where tempo will change
+        if i == len(map.beats) - 1:
+            map.last_tempo = tempo
+        else: // adjust all future beats
+            var beats = map.beats
+            // compute differences in beats:
+            var diff = beats[i + 1].beat - beats[i].beat
+            // convert beat difference to seconds at new tempo:
+            diff = diff / tempo
+            // figure out old time difference:
+            var old_diff = beats[i + 1].time - time
+            // compute difference too
+            diff = diff - old_diff
+            // apply new_diff to score and beats
+            while i < len(beats):
+                beats[i].time = beats[i].time + diff
+                i = i + 1
+        // map.show()
+        if units_should_be_seconds:
+            convert_to_seconds()
+        return t
+
+
+    def set_time_sig(beat, num, den)
+        //display "set_time_sig", beat, num, den, time_sig
+        if not time_sig:
+            time_sig = []
+        //display "set_time_sig 2", time_sig
+        time_sig.append(Alg_time_sig(beat, num, den))
+        //display "set_time_sig 3", time_sig
+        // time_sig.resort('time_sig_compare')
+        //display "set_time_sig 4", time_sig
+
+
+    def add_event(event, track_num):
+        # add an Alg_event at the end of a track given by track_num
+        # NOTE: the track must exist or an error will occur; this 
+        # is considered a feature to avoid unexpected track creation
+        # (Use add_track to make sure a track exists)
+        tracks[track_num].append(event)
+
+
+    def add_track(track_num):
+        # make sure track_num exists as a track
+        if track_num < 0:
+            return nil
+        if not tracks:
+            tracks = []
+        while len(tracks) < track_num + 1:
+            tracks.append([])
+        return t
+
+    def merge_tracks():
+        var sum = 0
+        for i = 0 to len(tracks):
+            sum = sum + len(tracks[i])
+        var notes = array(sum)
+        iteration_begin()
+        var notes_index = 0
+        var event = iteration_next()
+        while event
+            notes[notes_index] = event
+            notes_index = notes_index + 1
+            event = iteration_next()
+        tracks = [notes] // replace all tracks with this one
+        iteration_end()
+
+
+    def iteration_begin():
+        current = array(len(tracks))
+        for i = 0 to len(tracks):
+            current[i] = 0
+        track_index = nil
+
+        
+    def iteration_next():
+        // find lowest track time of any track
+        var next = 1000000.0
+        var cur
+        for i = 0 to len(tracks):
+            var tr = tracks[i]
+            cur = current[i]
+            if cur < len(tr) and tr[cur].time < next:
+                next = tr[cur].time
+                track_index = i
+        if next < 1000000.0:
+            cur = current[track_index]
+            current[track_index] = cur + 1
+            return tracks[track_index][cur]
+        else:
+            return nil
+
+
+    def iteration_end():
+        current = nil // free array
+
+
+    def set_tempo(tempo, start_beat, end_beat):
+        # set tempo from start_beat to end_beat
+        if start_beat >= end_beat:
+            return false
+        var units_should_be_seconds = units_are_seconds
+        convert_to_beats()
+        // algorithm: insert a beat event if necessary at start_beat
+        //    and at end_beat
+        // delete intervening map elements
+        // change the tempo
+        insert_beat(map.beat_to_time(start_beat), start_beat)
+        insert_beat(map.beat_to_time(end_beat), end_beat)
+        var start_x = map.locate_beat(start_beat) + 1
+        var stop_x = map.locate_beat(end_beat)
+        while stop_x < len(map.beats):
+            map.beats[start_x] = map.beats[stop_x]
+            start_x = start_x + 1
+            stop_x = stop_x + 1
+        map.beats.set_len(start_x) // truncate the map to new length
+        insert_tempo(tempo, start_beat)
+        if units_should_be_seconds:
+            convert_to_seconds()
+
+    def set_start_time(event, time):
+        # set the start time of an event to time
+        # first, find the event
+        for i = 0 to len(tracks):
+            var track = tracks[i]
+            for j = 0 to len(track):
+                if event == track[j]:
+                    track.uninsert(j)
+                    event.time = time
+                    insert_event_to_track(j, event)
+                    return
+        assert(false)
+
+    def insert_event_to_track(track_num, event)
+        var track = tracks[track_num]
+        track.append(event)
+        track.resort('event_less_than')
+
+    def time_sig_find_beat(beat, optional for_read)
+    # Index where would you would insert a new time signature at beat.
+    # If for_read is true, find index of the time signature for the beat
+    # and return nil if there is no time signature
+        var i = 0
+        if not time_sig:
+            time_sig = []  // need an array to return a location
+        while i < len(time_sig) and time_sig[i].beat < beat:
+            i = i + 1
+        if for_read:
+            // if beat is exactly on the time signature change, then return i
+            if i < len(time_sig) and time_sig[i].beat == beat:
+                return i
+            i = i - 1  // back up to previous (controlling) time signature
+            // make sure we are in bounds
+            if i < 0:
+                return nil
+        return i
+
+    def time_sig_show()
+        print "time sig:",
+        if time_sig:
+            for ts in time_sig
+                print ts.num; ":"; ts.den; "@"; ts.beat,
+        print
+
+    def time_sig_cut(start, len)
+        // display "time_sig_cut", start, len
+        time_sig_show()
+        # remove time_sig's from start to start+len
+        // first, put units in beats to match time_sigs
+        var end = start + len
+        if not time_sig:
+            return
+        if units_are_seconds:
+            start = map.time_to_beat(start)
+            end = map.time_to_beat(end)
+        // now rewrite time_sig[]: copy from i_in to i_out (more or less)
+        var i_in = 0
+        var i_out = 0
+        // first, figure out where to begin cut region
+        i_in = time_sig_find_beat(start)
+        i_out = i_in
+        // scan to end of cut region
+        while i_in < len(time_sig) and time_sig[i_in].beat < end:
+            i_in = i_in + 1
+        // change time_sig at start if necessary
+        //    there is a time_sig that was skipped if i_in > i_out. 
+        //    if i_in > i_out and the next time change is at end, we are
+        //    ok because it will be copied, but if the next time change
+        //    is after end, then maybe we should insert a time change
+        //    corresponding to what is in effect at end. We can skip this
+        //    insert if it corresponds to whatever is in effect at start
+        if i_in > i_out and i_in < len(time_sig) and
+           time_sig[i_in].beat > end + alg_eps and
+           (i_out == 0 or time_sig[i_out - 1].num != time_sig[i_in - 1].num or
+                          time_sig[i_out - 1].den != time_sig[i_in - 1].den):
+            time_sig[i_out] = time_sig[i_in - 1]
+            time_sig[i_out].beat = start
+        // scan from end to len(time_sig)
+        while i_in < len(time_sig):
+            var ts = time_sig[i_in]
+            ts.beat = ts.beat - len
+            time_sig[i_out] = ts
+            i_in = i_in + 1
+            i_out = i_out + 1
+        time_sig.set_len(i_out)
+        
+        
+    def time_sig_insert(beat, num, den)
+        // find insertion point:
+        for i = 0 to len(time_sig):
+            if within(time_sig[i].beat, beat, alg_eps)
+                // overwrite location i with new info
+                time_sig[i].beat = beat
+                time_sig[i].num = num
+                time_sig[i].den = den
+                return
+            elif time_sig[i].beat > beat:
+                if (i > 0 and // check if redundant with prev. time sig
+                    time_sig[i - 1].num == num and
+                    time_sig[i - 1].den == den and
+                    within((beat - time_sig[i - 1].beat %
+                            4 * time_sig[i - 1].num / time_sig[i - 1].den),
+                           0, alg_eps)) or
+                   // check if redundant with implied initial 4/4 time sig:
+                   (i == 0 and num == 4 and den == 4 and
+                    within(beat % 4, 0, alg_eps)):
+                    return // redundant inserts are ignored here
+                // insert new event at i
+                var ts = Alg_time_sig(beat, num, den)
+                time_sig.insert(i, ts)
+                return
+        // if we fall out of loop, then this goes at end
+        if max <= len(time_sig)
+            expand()
+        time_sig.append(Alg_time_sig(beat, num, den))
+
+
+    def time_sig_paste(beat, seq)
+        # insert time signatures from ts into time_sig
+        var from = seq.time_sig
+        //print "time_sig::insert from"
+        //time_sig_show(from)
+        // insert time signatures from seq into this time_sigs at start
+        if (not time_sig or len(time_sig) == 0) and
+           (not from or len(from) == 0):
+            return // default applies
+        var i = time_sig_find_beat(beat)
+        // remember the time signature at the splice point
+        var num_after_splice = 4
+        var den_after_splice = 4 // default
+        // three cases: 
+        //  1) time sig at splice is at i-1
+        //     for this, we must have len>0 & i>0
+        //     two sub-cases:
+        //       A) i < len && time_sig[i].beat > start
+        //       B) i == len
+        //  2) time_sig at splice is at i
+        //     for this, i < len && time_sig[i].beat ~= start
+        //  3) time_sig at splice is default 4/4
+        if len(time_sig) > 0 and i > 0 and
+            ((i < len(time_sig) and time_sig[i].beat > beat + alg_eps) or
+             (i == len(time_sig))):
+            num_after_splice = time_sig[i - 1].num
+            den_after_splice = time_sig[i - 1].den
+        elif i < len(time_sig) and time_sig[i].beat <= beat + alg_eps
+            num_after_splice = time_sig[i].num
+            den_after_splice = time_sig[i].den
+        // i is where insert will go, time_sig[i].beat > beat
+        // begin by adding duration to time_sig is at i and above
+        // move time signatures forward by duration of seq
+        var dur = seq.beat_dur
+        while i < len(time_sig)
+            time_sig[i].beat = time_sig[i].beat + dur
+            i = i + 1
+        //print "time_sig::insert after making space"
+        //time_sig_show(time_sig)
+        // now insert initial time_signature at beat. This may create
+        // an extra measure if seq does not begin on a measure boundary
+        time_sig_insert(beat, 4, 4) // in case seq uses default starting signature
+        //print "time_sig::insert after 4/4 at beat"
+        //time_sig_show(time_sig)
+        // insert time signatures from seq offset by beat
+        for i = 0 to len(from)
+            time_sig_insert(beat + from[i].beat, from[i].num, from[i].den)
+        //print "time_sig::insert after pasting in sigs"
+        //time_sig_show(time_sig)
+        // now insert time signature at end of splice
+        time_sig_insert(beat + dur, num_after_splice, den_after_splice)
+        
+
+    def time_sig_trim(start, end)
+        # remove time_sig's not in [start, start+end)
+        if not time_sig
+            return
+        // make unit be beats
+        if units_are_seconds:
+            start = map.time_to_beat(start)
+            end = map.time_to_beat(end)
+        // now copy from i_in to i_out as we scan time_sig array
+        var i_in = 0
+        var i_out = 0
+        // put time_sig at start if necessary
+        // if 0 < i_in < len, then the time sig at i_in is either
+        // at start or after start. 
+        //     If after start, then insert time sig at i_in-1 at 0. 
+        //     Otherwise, we will pick up time sig at i_in below.
+        // If 0 == i_in < len, then the time sig at i_in is either
+        // at start or after start.
+        //     If after start, then time sig at 0 is 4/4, but that is the
+        //          default, so do nothing.
+        //     Otherwise, we will pick up time sig at i_in below.
+        // If 0 < i_in == len, then insert time_sig at i_in-1 at start
+        // If 0 == i_in == len, then 4/4 default applies and we are done.
+        // 
+        // So the conditions for inserting time_sig[in_i-1] at 0 are:
+        //     (0 < i_in < len and time_sig[i_in] > start + alg_eps) OR
+        //     (0 < i_in == len)
+        // We can rewrite this to 
+        //     (0 < i_in) && ((i_in < len && 
+        //                     time_sig[i_in].beat > start + alg_eps) ||
+        //                    (i_in == len)))
+        //     
+        if 0 < i_in and ((i_in < len(time_sig) and 
+                          time_sig[i_in].beat > start + alg_eps) or
+                         (i_in == len(time_sig))):
+            time_sig[0] = time_sig[i_in - 1]
+            time_sig[0].beat = 0
+            i_out = 1
+        // scan to end of cut region
+        while i_in < len(time_sig) and time_sig[i_in].beat < end - alg_eps:
+            var ts = time_sig[i_in]
+            ts.beat = ts.beat - start
+            time_sig[i_out] = ts
+            i_in = i_in + 1
+            i_out = i_out + 1
+        time_sig.set_len(i_out)
+
+
+    def time_sig_insert_beats(beat, len)
+        var i = 0
+        var found = false
+        while not found and i < len(time_sig):
+            if time_sig[i].beat < beat + alg_eps
+                found = true
+            i = i + 1
+        while i < len(time_sig):
+            time_sig[i].beat = time_sig[i].beat + len
+            i = i + 1
+       
+
+    def track_to_seq(track, duration)
+        var seq = Alg_seq()
+        seq.tracks[0] = track
+        seq.units_are_seconds = units_are_seconds
+        seq.set_dur(duration)
+        return seq
+
+
+    def set_dur(duration):
+        # set beat_dur and real_dur
+        if units_are_seconds:
+            real_dur = duration
+            beat_dur = map.time_to_beat(duration)
+        else
+            beat_dur = duration
+            real_dur = map.beat_to_time(duration)
+
+
+    def get_dur()
+        if units_are_seconds:
+            return real_dur
+        else
+            return beat_dur
+
+
+    def get_intrinsic_start(): // get start time of first note in sequence
+        var start = 1000000
+        for track in tracks:
+            // find first note in track, if any
+            var i = 0
+            while i < len(track) and not isinstance(track[i], Alg_note):
+                i = i + 1
+            if i < len(track):
+                start = min(start, track[i].time)
+        return start
+
+
+    def get_intrinsic_dur(): // get duration implied by last note-off
+        // returns seconds or beats depending on units stored in this Alg_seq
+        var iter = Alg_iterator(this, false)
+        iter.begin()
+        var end_time = 0
+        var pevent = iter.next()
+        while pevent:
+            var event = pevent.track[pevent.index]
+            end_time = max(end_time, event.get_end_time())
+            pevent = iter.next()
+        iter.end()
+        return end_time
+
+
+    def cut_from_track(track_num, start, len, all):
+        // cut events between start and start + len
+        // if all is true, also cut any note that overlaps cut region
+        // events to the right of start + len are moved left by len
+        // return the events that were cut, shifted left by start
+        var track = tracks[track_num]
+        var result = []
+        var move_to = 0
+        for i = 0 to len(track):
+            var event = track[i]
+            if event.overlap(start, len, all)
+                event.time = event.time - start
+                result.append(event)
+            else
+                track[move_to] = event
+                move_to = move_to + 1
+                if event.time > start + len - alg_eps:
+                    event.time = event.time - len
+        track.set_len(move_to)
+        return result
+        
+
+    def time_sig_copy(ts)
+        # note that this copies the time sig array passed as a paramter
+        # it can copy any array of time sigs, not just from this Alg_seq
+        var sigs
+        if ts:
+            sigs = array(len(ts))
+            sigs.set_len(0)
+            for s in ts:
+                sigs.append(s.copy())
+        return sigs
+
+
+    def cut(start, len, all)
+        // return sequence from start to start+len and modify this
+        // sequence by removing that time-span
+        var result = Alg_seq()
+        result.tracks = array(len(tracks))
+        result.map = map.copy()
+        result.time_sig = time_sig_copy(time_sig)
+        result.units_are_seconds = units_are_seconds
+        for i = 0 to len(tracks)
+            result.tracks[i] = cut_from_track(i, start, len, all)
+        time_sig_cut(start, len)
+        result.time_sig_trim(start, start + len)
+        map.cut(start, len, units_are_seconds)
+        result.map.trim(start, start + len, units_are_seconds)
+        set_dur(get_dur() - len)
+        result.set_dur(len)
+        return result
+
+    def copy_interval_from_track(track_num, start, len, all):
+        // copy events between start and start + len
+        // if all is true, also copy any note that overlaps cut region
+        // return the events that were copied, shifted left by start
+        var track = tracks[track_num]
+        var result = []
+        var move_to = 0
+        for i = 0 to len(track):
+            var event = track[i]
+            if event.overlap(start, len, all)
+                var ev = event.copy()
+                ev.time = ev.time - start
+                result.append(ev)
+        return track_to_seq(result, len)
+
+    def copy_interval(start, len, all):
+        // return (new) sequence from start to start + len
+        var result = Alg_seq()
+        result.tracks = array(len(tracks))
+        result.map = map.copy()
+        if time_sig:
+            var sigs = array(len(time_sig))
+            sigs.set_len(0)
+            for ts in time_sig:
+                sigs.append(ts.copy())
+            result.time_sig = sigs
+        result.units_are_seconds = units_are_seconds
+        for i = 0 to len(tracks)
+            result.tracks[i] = copy_interval_from_track(
+                                       i, start, len, all).tracks[0]
+        result.time_sig_trim(start, start + len)
+        result.map.trim(start, start + len, units_are_seconds)
+        result.set_dur(len)
+        return result
+
+    def paste_to_track(track_num, time, seq)
+        // assume there is only one track in seq
+        // first shift events to make space for seq
+        var dur
+        if units_are_seconds:
+            seq.convert_to_seconds()
+            dur = seq.real_dur
+        else
+            seq.convert_to_beats()
+            dur = seq.beat_dur
+        //display "paste_to_track", units_are_seconds, dur
+        for ev in tracks[track_num]:
+            if ev.time > time - alg_eps
+                ev.time = ev.time + dur
+        for ev in seq.tracks[0]:
+            ev = ev.copy()
+            ev.time = ev.time + time
+            insert_event_to_track(track_num, ev)
+
+    def paste(beat, seq)
+        # insert seq at time
+        // to manipulate time map, we need units as beats
+        // save original form so we can convert back if necessary
+        var units_should_be_seconds = units_are_seconds
+        var seq_units_should_be_seconds = seq.units_are_seconds
+        if units_are_seconds
+            beat = map.time_to_beat(beat)
+            convert_to_beats()
+        seq.convert_to_beats()
+
+        // paste corresponding tracks
+        var seq_tracks = seq.tracks
+        var new_seq_tracks = array(1)
+        seq.tracks = new_seq_tracks // temporary modification
+        for i = 0 to len(seq_tracks):
+            if i >= len(tracks):
+                tracks.append([])
+            new_seq_tracks[0] = seq_tracks[i]
+            paste_to_track(i, beat, seq)
+        // make sure all tracks were opened up for an insert, even if
+        // there is nothing to insert
+        new_seq_tracks[0] = []
+        for i = i to len(tracks):
+            paste_to_track(i, beat, seq)
+        //display "before time_map_paste", beat, seq.beat_dur
+        allegro_write(seq, stdout)
+        // paste in tempo track
+        time_map_paste(beat, seq.beat_dur, seq.map)
+        // paste in time signatures
+        //print "this is the time_sig array for the copied interval"
+        //time_sig_show(seq.time_sig)
+        time_sig_paste(beat, seq)
+        set_dur(get_dur() + seq.get_dur())
+        if units_should_be_seconds:
+            convert_to_seconds()
+        if seq_units_should_be_seconds:
+            seq.convert_to_seconds()
+
+
+    def merge_to_track(track_num, time, seq)
+        // assume there is only one track in seq
+        for ev in seq.tracks[0]:
+            ev = ev.copy()
+            ev.time = ev.time + time
+            insert_event_to_track(track_num, ev)
+        
+
+    def merge(time, seq)
+        // paste corresponding tracks
+        var seq_tracks = seq.tracks
+        var new_seq_tracks = array(1)
+        seq.tracks = new_seq_tracks // temporary modification
+        for i = 0 to len(seq_tracks):
+            if i >= len(tracks):
+                tracks.append([])
+            new_seq_tracks[0] = seq_tracks[i]
+            merge_to_track(i, time, seq)
+        set_dur(max(get_dur(), time + seq.get_dur()))
+
+    def silence_track(track_num, start, len, all)
+        // remove events in [time, time + len) and close gap
+        var track = tracks[track_num]
+        var move_to = 0
+        for i = 0 to len(track):
+            var event = track[i]
+            if not event.overlap(start, len, all)
+                track[move_to] = event
+                move_to = move_to + 1
+        track.set_len(move_to)
+
+    def silence_events(start, len, all)
+        // remove events in [time, time + len)
+        //display "clear_events", tracks, len(tracks)
+        for i = 0 to len(tracks)
+            clear_track(i, start, len, all)
+
+    def clear_track(track_num, start, len, all)
+        // remove events in [time, time + len)
+        var track = tracks[track_num]
+        var move_to = 0
+        for i = 0 to len(track):
+            var event = track[i]
+            if not event.overlap(start, len, all)
+                track[move_to] = event
+                if event.time > start + len - alg_eps:
+                    event.time = event.time - len
+                move_to = move_to + 1
+        track.set_len(move_to)
+
+    def clear_events(start, len, all)
+        // remove events in [time, time + len)
+        for i = 0 to len(tracks)
+            clear_track(i, start, len, all)
+        time_sig_cut(start, len)
+        map.cut(start, len, units_are_seconds)
+
+    def insert_silence_in_track(track_num, start, len)
+        var track = tracks[track_num]
+        for i = 0 to len(track):
+            var event = track[i]
+            if event.time > start - alg_eps:
+                    event.time = event.time + len
+
+    def insert_silence(start, len)
+        for i = 0 to len(tracks)
+            insert_silence_in_track(i, start, len)
+        var t_beats = start
+        var len_beats = len
+        // insert into time_sig array; use time_sig_paste,
+        // which requires us to build a simple time_sig array
+        //display "insert_silence", units_are_seconds, start, len
+        if units_are_seconds
+            map.insert_time(start, len)
+            t_beats = map.time_to_beat(start)
+            len_beats = map.time_to_beat(start + len) - t_beats
+        else
+            map.insert_beats(t_beats, len_beats)
+        if time_sig
+            time_sig_insert_beats(t_beats, len_beats)
+
+
+    def find_events_in_range(track_num, start, len, all, optional channel_mask,
+                             event_type_mask)
+        var result = []
+        for event in tracks[track_num]
+            if event.overlap(start, len, all)
+                if (not channel_mask or 
+                    (channel_mask & (1 << event.chan)) != 0) and
+                   (not event_type_mask or 
+                    (event_type_mask & (1 << event.event_type())) != 0)
+                    result.append(event)
+        return result
+
+
+sr_letter_to_type = {"i": 'Integer', "r": 'Real', "s": 'String',
+                     "l": 'Logical', "a": 'Symbol'}
+
+
+def pending_greater_than(p1, p2):
+    p1.time > p2.time
+
+
+class Pending_event
+    var time
+    var track
+    var track_index
+    var index
+    var note_on
+    var cookie
+    var offset
+
+    def init(tim, t, tx, i, n, c, o)
+        time = tim
+        track = t
+        track_index = tx
+        index = i
+        note_on = n
+        cookie = c
+        offset = o
+
+    def to_string():
+        var list = ["Pending_event: time ", str(time),
+                    " track_index ", str(track_index),
+                    " index ", str(index),
+                    " note_on ", str(note_on),
+                    " cookie ", str(cookie),
+                    " offset ", str(offset)]
+        // caution: track_index could be out of bounds
+        if track_index < len(track):
+            var note = track[track_index]
+            if isinstance(note, Alg_note):
+                list.append(" pitch ")
+                list.append(str(note.pitch))
+        flatten(list)
+
+    def alg_event(): // get the Alg_event referenced by this
+        track[index]
+    
+    def show()
+        print to_string()
+
+
+// An iterator for sequence events (notes and updates)
+// The iterator can visit each note twice:
+// once for note-on, and once for note-off. The iterator returns
+// Pending_event objects (see above) with a lot of info for each
+// event.
+class Alg_iterator
+    var seq
+    var note_off_flag
+    var pending
+    var realtime_offsets // delay time offsets in seconds
+    var vtsched_timemap // time map for converting delay offsets
+
+    // Create an iterator: s = an Alg_seq, note_off if iterator should
+    // return Pending_event objects for note_off's as well as note_on's
+    // If note_off == false, you can still get note_off events by calling
+    // request_note_off() for the notes you are interested in.
+    def init(s, note_off, optional vtsched = nil, track_delay_offset = nil)
+        seq = s
+        note_off_flag = note_off
+        realtime_offsets = track_delay_offset
+        vtsched_timemap = vtsched
+
+    def set_track_delay(track_delay_offset)
+        realtime_offsets = track_delay_offset
+        // print "set Alg_iterator Offsets :: ", realtime_offsets
+
+    def set_vtsched_timemap(vtsched)
+        vtsched_timemap = vtsched
+        // print "set Alg_iterator vtsched timemap :: ", vtsched_timemap
+
+    def begin_seq(seq, cookie)
+        pending = []
+        for track at i in seq.tracks
+            if len(track) > 0
+                var offset = 0
+                if realtime_offsets and i < len(realtime_offsets) and
+                   vtsched_timemap:
+                    offset = realtime_offsets[i] * vtsched_timemap.bps
+                insert(track, i, 0, true, cookie, offset)
+
+    def begin(optional cookie = nil)
+        begin_seq(seq, cookie)
+
+    def next(optional end_time = 0)
+        if not pending:
+            error("Alg_iterator::next called, but " +
+                  "Alg_iterator::begin was not called.")
+        if len(pending) == 0
+            return nil
+        var n = pending.unappend()
+        var event = n.track[n.index]
+        var offset
+        if n.note_on:
+            offset = 0
+            if realtime_offsets and n.track_index < len(realtime_offsets) and
+               vtsched_timemap:
+                offset = realtime_offsets[n.track_index] * vtsched_timemap.bps
+
+            // insert a note-off for this note to pending if note_off_flag
+            if note_off_flag and isinstance(event, Alg_note) and
+               (end_time == 0 or event.get_end_time() + offset < end_time)
+                insert(n.track, n.track_index, n.index, false, n.cookie, offset)
+            // insert the next note to pending if note starts before end_time
+            if n.index + 1 < len(n.track) and
+               (end_time == 0 or n.track[n.index + 1].time + offset < end_time)
+                insert(n.track, n.track_index, n.index + 1, true, 
+                       n.cookie, offset)
+        return n
+
+
+    // stop iterating to discover future notes, but retrieve all the
+    // pending note-off events
+    def next_noteoff():
+        if not pending:
+            error("Alg_iterator::next called, but " +
+                  "Alg_iterator::begin was not called.")
+        if len(pending) == 0
+            return nil
+        var n = pending.unappend()
+        while n.note_on:
+            if len(pending) == 0:
+               return nil
+            n = pending.unappend()
+        return n
+
+
+    // if next returns p and you want to request a note-off for it
+    // (because you played it), you can call request_note_off(p).
+    // This is only necessary if the note_off_flag is false, otherwise,
+    // all note offs are returned by the iterator.
+    def request_note_off(p):
+        var offset = 0
+        if realtime_offsets and p.track_index < len(realtime_offsets) and
+           vtsched_timemap:
+            offset = realtime_offsets[p.track_index] * vtsched_timemap.bps
+        insert(p.track, p.track_index, p.index, false, p.cookie, offset)
+
+    def end()
+        nil // do nothing
+
+    def insert(track, track_index, index, note_on, cookie, offset)
+        var event = track[index]
+        var time = (event.time if note_on else (event.get_end_time() + offset))
+        var p = Pending_event(time, track, track_index, index, note_on, 
+                              cookie, offset)
+        pending.append(p)
+        pending.resort('pending_greater_than')
+
+
+class Alg_reader:
+    var file
+    var line_no
+    var line_parser
+    var field
+    var error_flag
+    var seq
+    var track_num
+
+
+    def init(a_file):
+        file = a_file // save the file
+        line_no = 0
+        seq = Alg_seq()
+        track_num = 0
+
+
+    def readline():
+        var line = file.readline()
+        //print "line", line
+        line_parser = false
+        if line and len(line) > 0:
+            line_parser = String_parse(line)
+            error_flag = false
+
+    def process_attributes(attributes, time):
+        //print "process_attributes:", attributes
+        if attributes:
+            if attributes.has_key('tempor'):
+                var tempo = attributes['tempor']
+                attributes.remove('tempor')
+                seq.insert_tempo(tempo, seq.map.time_to_beat(time))
+                //print "called insert_tempo for -tempor"
+            if attributes.has_key('beatr'):
+                var beat = attributes['beatr']
+                attributes.remove('beatr')
+                seq.insert_beat(time, beat)
+            // display "process_attributes", attributes
+
+
+    def parse():
+        var voice = 0
+        var key = 60
+        var loud = 100.0
+        var pitch = 60.0
+        var dur = 1.0
+        var time = 0.0
+        var timesig_num = nil
+        var timesig_den = nil
+        var timesig_time = nil
+        readline()
+        var valid = nil // ignore blank lines
+        while line_parser:
+            var time_flag = false
+            var next_flag = false
+            var next
+            var voice_flag = false
+            var loud_flag = false
+            var dur_flag = false
+            var new_pitch = nil // "P" syntax
+            var new_key = nil   // "K" syntax
+            var new_note = nil  // "A"-"G" syntax
+            var attributes = nil
+            if line_parser.skip("#track"):
+                var s = line_parser.get_nonspace()
+                track_num = parse_int(" " + s)
+                seq.add_track(track_num)
+                line_parser.skip_space()
+                if line_parser.remaining_len() > 1:  // don't want just newline
+                    var attr = 'seqnames' if track_num == 0 else 'tracknames'
+                    // everything left is name, but remove trailing space/newln:
+                    var name = line_parser.remainder()
+                    while isspace(name.last()):
+                        name = subseq(name, 0, -1)
+                    seq.tracks[track_num].append(Alg_update(0, -1, -1,
+                                                            attr, name))
+                    // display "found track/seq name", attributes
+                readline()
+            elif line_parser.skip("#offset"):
+                s = line_parser.get_nonspace()
+                seq.offset = parse_real(" " + s)
+                readline()
+            else:
+//                var save_string = line_parser.string
+//                if find(line_parser.string, "#") >= 0:  // quick test passes
+//                    // so we have to parse delimited strings to see if we
+//                    // have an actual free-standing hash character:
+//                    var non_comment = line_parser.get_delimited_quoted("#", false)
+//                    display "found hash", save_string, non_comment
+//                    if non_comment == nil:  // delimited string not closed
+//                        line_parser.init(save_string)
+//                    else:  // maybe we removed the comment;
+//                           // reinitialize without it:
+//                        line_parser.init(non_comment)
+                field = line_parser.get_nonspace_quoted()
+                var pk = line_parser.peek()
+                if pk and not isspace(pk): // then must be a string constant
+                    field = field + line_parser.get_nonspace_quoted()
+                while field != "":
+                    // print "field", "|";field;"|", "|";line_parser.string;"|", 
+                    // print line_parser.pos
+                    var first = toupper(field[0])
+                    if find("ABCDEFGKLPUSIQHW-", first) >= 0:
+                        valid = true // it is a note or event
+
+                    if first == "V":
+                        if voice_flag:
+                            parse_error(field, 0, "Voice specified twice")
+                        else:
+                            voice = parse_chan(field)
+                        voice_flag = true
+                    elif first == "T":
+                        if time_flag:
+                            parse_error(field, 0, "Time specified twice")
+                        else:
+                            time = parse_dur(field, 0)
+                        time_flag = true
+                    elif first == "N":
+                        if next_flag:
+                            parse_error(field, 0, "Next specified twice")
+                        else:
+                            next = parse_dur(field, time)
+                        next_flag = true
+                    elif first == "K":
+                        if new_key:
+                            parse_error(field, 0, "Key specified twice")
+                        else:
+                            new_key = parse_key(field)
+                        #key_flag = true
+                    elif first == "L":
+                        if loud_flag:
+                            parse_error(field, 0, "Loudness specified twice")
+                        else:
+                            loud = parse_loud(field)
+                        loud_flag = true
+                    elif first == "P":
+                        if new_note or new_pitch:
+                            parse_error(field, 0, "Pitch specified twice")
+                        else:
+                            new_pitch = parse_key(field)
+                        #pitch_flag = true
+                    elif first == "U":
+                        if dur_flag:
+                            parse_error(field, 0, "Dur specified twice")
+                        else:
+                            dur = parse_dur(field, time)
+                        dur_flag = true
+                    elif find("SIQHW", first) >= 0:
+                        if dur_flag:
+                            parse_error(field, 0, "Dur specified twice")
+                        else:
+                            dur = parse_dur("U" + field, time)
+                        dur_flag = true
+                    elif find("ABCDEFG", first) >= 0:
+                        if new_note or new_pitch:
+                            parse_error(field, 0, "Pitch specified twice")
+                        else:
+                            new_note = parse_key("K" + field)
+                            //print "new_note", new_note
+                        #note_flag = true
+                    elif first == "-":
+                        var pair = parse_attribute(field)
+                        if pair: // enter attribute-value pair
+                            if not attributes:
+                                attributes = {}
+                            attributes[pair[0]] = pair[1]
+                            //print "in parser: attributes", attributes
+                    elif first == "#":
+                        line_parser.init("")
+                    else:
+                        parse_error(field, 0, "Unknown field")
+
+                    if error_flag:
+                        field = "" // exit the loop
+                    else:
+                        field = line_parser.get_nonspace_quoted()
+                        pk = line_parser.peek()
+                        if pk and not isspace(pk):
+                            // must be a string constant
+                            field = field + line_parser.get_nonspace_quoted()
+                        // print "field is:", field
+            // a case analysis:
+                // Key < 128 counts as both key and pitch
+                // A-G implies pitch AND key unless key given too
+                //   K60 P60 -- both are specified, use them
+                //   K60 P60 C4 -- overconstrained, an error
+                //   K60 C4 -- overconstrained
+                //   K60 -- OK, pitch is 60
+                //   C4 P60 -- over constrained
+                //   P60 -- OK, key is from before, pitch is 60
+                //   C4 -- OK, key is 60, pitch is 60
+                //   <nothing> -- OK, key and pitch from before
+                //   K200 with P60 ok, pitch is 60
+                //   K200 with neither P60 nor C4 uses 
+                //       pitch from before
+                // figure out what the key/instance is:
+                if new_key: // it was directly specified
+                    key = new_key
+                    if key < 128 and new_note:
+                        parse_error("", 0, "Pitch specified twice")
+                elif new_note: // "A"-"G" used
+                    key = new_note
+                if new_pitch:
+                    pitch = new_pitch
+                    #if new_note: -- this is already handled above
+                    #    parse_error("", 0, "Pitch specified twice")
+                elif key < 128:
+                    pitch = key
+                // now we have acquired new parameters
+                // if it is a note, then enter the note
+                if valid:
+                    // change tempo or beat
+                    process_attributes(attributes, time)
+                    // if there is a duration or pitch, make a note:
+                    if new_pitch or dur_flag or new_note:
+                        new_key = nil
+                        new_pitch = nil
+                        new_note = Alg_note()
+                        new_note.chan = voice
+                        new_note.time = time
+                        new_note.dur = dur
+                        new_note.key = key
+                        new_note.pitch = pitch
+                        new_note.loud = loud
+                        new_note.attributes = attributes
+                        seq.add_event(new_note, track_num) // sort later
+                    else:
+                        var update_key
+                        // key or pitch must appear explicitly; otherwise
+                        //    update applies to channel
+                        if new_key or new_pitch:
+                            update_key = key
+                        if loud_flag:
+                            var new_upd = Alg_update()
+                            new_upd.chan = voice
+                            new_upd.time = time
+                            new_upd.key = update_key
+                            new_upd.attribute = 'loudr'
+                            new_upd.value = pitch
+                            seq.add_event(new_upd, track_num)
+                        if attributes:
+                            for a in attributes.keys():
+                                // try to reconstruct time signature. We need
+                                // both tsnum and tsden for the same time. When
+                                // we find first one, set the tstime. When we
+                                // find the 2nd (indicated by tstime != nil),
+                                // if the times don't match, discard the other
+                                // by setting it to nil and remember the latest
+                                // time.
+                                if a == 'timesig_numr':
+                                    if not timesig_time:  // found 1st attribute
+                                        timesig_time = time
+                                    elif timesig_time != time:  // can't use den
+                                        timesig_time = time
+                                        timesig_den = nil
+                                    timesig_num = attributes[a]
+                                elif a == 'timesig_denr':
+                                    if not timesig_time:
+                                        timesig_time = time
+                                    elif timesig_time != time:
+                                        timesig_time = time
+                                        timesig_num = nil
+                                    timesig_den = attributes[a]
+                                if a == 'timesig_numr' or a == 'timesig_denr':
+                                    if timesig_num and timesig_den:
+                                        seq.set_time_sig(
+                                            seq.map.time_to_beat(time),
+                                            timesig_num, timesig_den)
+                                        timesig_num = nil
+                                        timesig_den = nil
+                                        timesig_time = nil
+                                else:  // any other attributes
+                                    new_upd = Alg_update()
+                                    new_upd.chan = voice
+                                    new_upd.time = time
+                                    new_upd.key = update_key
+                                    new_upd.attribute = a
+                                    new_upd.value = attributes[a]
+                                    seq.add_event(new_upd, track_num)
+                    if next_flag:
+                        time = time + next
+                    else:
+                        time = time + dur
+                    //print "new time", time, next_flag, next, dur_flag, dur
+                readline()
+        //print "Finished reading score"
+        if not error_flag:
+            seq.convert_to_seconds() // make sure format is correct
+            //print "sorting score"
+            for track in seq.tracks
+                track.sort('event_greater_than')
+            //print "finished sorting score"
+        //print "parse returns error_flag", error_flag
+        return error_flag
+
+
+    def parse_int(field):
+        var int_string = subseq(field, 1)
+        var msg = "Integer expected"
+        for i = 0 to len(int_string):
+            c = int_string[i]
+            if not isdigit(c):
+                parse_error(field, 1, msg)
+                return 0
+        if len(int_string) < 1:
+            parse_error(field, 1, msg)
+            return 0
+        return int(int_string)
+
+
+    def find_real_in(field, n):
+        // scans from offset n to the end of a real constant
+        var decimal // initially false
+        for i = n to len(field):
+            var c = field[i]
+            if not isdigit(c):
+                if c == "." and not decimal:
+                    decimal = true
+                else:
+                    return i
+        return len(field)
+
+
+    def parse_real(field):
+        var msg = "Real expected"
+        var decimal // initially false
+        var last = find_real_in(field, 1)
+        var real_string = subseq(field, 1, last)
+        if len(real_string) < 1 or last < len(field):
+           parse_error(field, 1, msg)
+           return 0
+        return real(real_string)
+
+
+    def parse_error(field, offset, message):
+        var position = line_parser.pos - len(field) + offset
+        error_flag = true
+        print line_parser.string;  // newline is already in string
+        for i = 0 to position:
+            print " ";
+        print "^"
+        print "    "; message
+
+
+    def parse_dur(field, base):
+        # print "parse_dur", field, base
+        var msg = "Duration expected"
+        var dur
+        if len(field) < 2:
+            // fall through to error message
+            nil
+        elif isdigit(field[1]):
+            var last = find_real_in(field, 1)
+            dur = real(subseq(field, 1, last))
+            // convert dur from seconds to beats
+            //print "parse_dur:", base; "+"; dur, 
+            dur = seq.map.time_to_beat(base + dur) - seq.map.time_to_beat(base)
+            //print "in beats: ", dur
+        else:
+            dur = duration_lookup.get(toupper(field[1]))
+            //print "dur from lookup", dur
+            last = 2
+        if dur:
+            dur = parse_after_dur(dur, field, last, base)
+            // print "seq.map.beat_to_time(1.0)", seq.map.beat_to_time(1.0),
+            // print     seq.map.beats, seq.map.last_tempo
+            dur = seq.map.beat_to_time(seq.map.time_to_beat(base) + dur) - base
+            // print seq.map.time_to_beat(base), dur, base
+            // print "parse_dur returns", dur
+            return dur
+        parse_error(field, 1, msg)
+        return 0
+
+
+    def parse_after_dur(dur, field, n, base):
+        // print "pad:", dur, field, n, base
+        if len(field) == n:
+            return dur
+        if field[n] == "T":
+            return parse_after_dur(dur * 2/3, field, n + 1, base)
+        if field[n] == ".":
+            return parse_after_dur(dur * 1.5, field, n + 1, base)
+        if isdigit(field[n]):
+            var last = find_real_in(field, n)
+            var f = real(subseq(field, n, last))
+            return parse_after_dur(dur * f, field, last, base)
+        if field[n] == "+":
+            return dur + parse_dur(subseq(field, n + 1, -1), 
+                                   seq.map.beat_to_time(
+                                       seq.map.time_to_beat(base) + dur))
+        parse_error(field, n, "Unexpected character in duration")
+        return dur
+
+
+    def parse_chan(field):
+        if len(field) <= 1
+            parse_error(field, 0, "Integer or - expected")
+            return 0
+        elif len(field) == 2 and field[1] == "-"
+            return -1 // special case: entire string is "-", interpret at -1
+        return parse_int(field)
+    
+
+    def parse_loud(field):
+        var msg = "Loudness expected"
+        if isdigit(field[1]):
+            return parse_int(field)
+        else:
+            var loud = loud_lookup.get(toupper(subseq(field, 1, -1)))
+            if loud:
+                return loud
+        parse_error(field, 1, msg)
+        return 100
+
+
+    def parse_key(field):
+        var msg = "Pitch expected"
+        if isdigit(field[1]):
+            return parse_int(field)
+        else:
+            var key = key_lookup.get(toupper(field[1]))
+            if key:
+                key = parse_after_key(key, field, 2)
+                return key
+        parse_error(field, 1, msg)
+        return 0
+            
+
+    def parse_after_key(key, field, n):
+        if len(field) == n:
+            return key
+        var c = toupper(field[n])
+        if c == "S":
+            return parse_after_key(key + 1, field, n + 1)
+        if c == "F":
+            return parse_after_key(key - 1, field, n + 1)
+        if isdigit(c):
+            var last = find_int_in(field, n)
+            var octave = int(subseq(field, n, last))
+            return parse_after_key(key + octave * 12, field, last)
+        parse_error(field, n, "Unexpected character in pitch")
+        return key
+
+    def find_int_in(field, n):
+        while len(field) > n and isdigit(field[n]):
+            n = n + 1
+        return n
+
+    def parse_attribute(field):
+        var i = 1
+        var attr
+        var val
+        while i < len(field):
+            if field[i] == ":":
+                attr = intern(subseq(field, 1, i))
+                val = parse_val(field, i + 1)
+                val = type_check(attr, val)
+                if error_flag:
+                    return nil
+                // display "parse_attribute returns", [attr, val]
+                return [attr, val]
+            i = i + 1
+        return nil
+
+
+    def type_check(attr, val):
+        var typ = str(attr) // get string representation of attribute
+        typ = typ[len(typ) - 1] // get last character
+        typ = sr_letter_to_type.get(typ) // convert to type symbol
+        if type(val) == typ:
+            val
+        // coercions:
+        elif type(val) == 'Integer' and typ == 'Real':
+            real(val)
+        elif type(val) == 'Logical' and typ == 'Symbol':
+            if val == 'false' or val == 'nil':
+                false
+            else:
+                true
+        elif type(val) == 'Symbol' and typ == 'String':
+            str(val)
+        else:
+            error_flag = true
+            parse_error("", 0, strcat(strcat(str(attr), ":"),
+                                      strcat(str(val), " type mismatch")))
+            val
+
+
+    def parse_val(s, i):
+        if i >= len(s):
+            return nil
+        if s[i] == "\"":
+            if i + 1 >= len(s) or s.last() != "\"":
+                parse_error(s, len(s), "Missing close double-quote")
+                return nil
+            return subseq(s, i + 1, -1)
+        if s[i] == "'":
+            if i + 1 >= len(s) or s.last() != "'":
+                parse_error(s, len(s), "Missing close single-quote")
+                return nil
+            return intern(subseq(s, i + 1, -1))
+        if isdigit(s[i]):
+            var pos = i + 1
+            var period = false
+            while pos < len(s):
+                if isdigit(s[pos]):
+                    nil
+                elif not period and s[pos] == ".":
+                    period = true
+                else:
+                    parse_error(s, pos, "Unexpected char in number")
+                    return nil
+                pos = pos + 1
+            s = subseq(s, i)
+            if period:
+                return real(s)
+            else:
+                return int(s)
+        return intern(subseq(s, i))
+
+
+
+duration_lookup = {"S": 0.5, "I": 0.5, "Q": 1, "H": 2, "W": 4}
+key_lookup = {"C": 12, "D": 14, "E": 16, "F": 17, "G": 19, "A": 21, "B": 23}
+loud_lookup = {"FFF": 127, "FF": 120, "F": 110, "MF": 100, "MP": 90, "P": 80, "PP": 70, "PPP": 60}
+
+
+def allegro_read(file)
+    var closefile
+    if type(file) == 'String':
+        file = open(file, "r")
+        closefile = t
+    if not file:
+        print "ERROR: allegro_read could not open", file
+        return nil
+    var reader = Alg_reader(file)
+    reader.parse()
+    if closefile:
+        file.close()
+    return reader.seq
+
+
+def test():
+    reader = Alg_reader(open("data/test.gro", "r"))
+    reader.parse()
+    score = reader.seq
+    print "score:", score
+    require "alwrite"
+    allegro_write(score, stdout)
+    reader = nil
+
+

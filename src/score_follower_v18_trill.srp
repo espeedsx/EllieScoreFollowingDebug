@@ -1,0 +1,1543 @@
+# score_follower_v18_tirll.srp -- modified score follower for trills
+#
+# Roger B. Dannenberg
+# May 2025
+#
+# based on:
+# Huiran Yu and Roger Dannenberg 2019-7
+# Based on the ICMC '85 paper of Roger Dannenberg and Josh Bloch
+# Dynamic algorithm modified with some time dependency
+
+require "debug"
+require "allegro"
+require "trillfinder"
+
+INFINITE = int(2 ** 49) - 1   // largest integer in Serpent
+SF_NINF = -idiv(INFINITE, 2)  // "negative infinity"
+
+def val2str(v): "-INF" if v == SF_NINF else str(v)
+
+// these will be (re)set from labels when score is loaded
+trill_max_ioi = nil
+trill_grace_ioi = nil
+
+VERSION = "v18tr"
+
+SFDBG = nil
+
+class Ornaments:
+    var trill_pitches
+    var grace_pitches
+    var ignore_pitches
+
+    def init(tp, gp, optional ip):
+        trill_pitches = tp
+        grace_pitches = gp
+        ignore_pitches = ip
+
+
+class Cevent:
+# a compound event or cevt as described by Dannenberg & Bloch paper
+    var time       // score time of the first note in the compound event
+    var pitches    // set of pitches in the compound event
+    var time_span  // the difference between first and last onset times
+    var ornaments  // trill_pitches, grace_pitches, and trill_time
+    var expected   // how many pitches are expected in the chord (includes
+                   // all pitches and any ornaments.trill_pitches that are
+                   // not in ignore_pitches; no grace notes are expected.
+
+    def init(time_):
+        time = time_
+        pitches = []
+        time_span = 0
+        expected = 0
+
+
+    def compute_expected():
+    # safety check: pitches, grace_pitches, trill_pitches are disjoint
+    # expected is set to number of pitches plus number of trill_pitches
+    # not in ignore_pitches
+        var orn = ornaments
+        expected = len(pitches)
+        if orn:
+            if orn.trill_pitches:
+                for p in orn.trill_pitches:
+                    if p in pitches:
+                        print "ERROR: trill pitch", p, "is in pitches of", this
+                    // we can use this loop to finish computing orn:
+                    if not (orn.ignore_pitches and p in orn.ignore_pitches):
+                        expected = expected + 1
+            if orn.grace_pitches:
+                for p in orn.grace_pitches:
+                    if p in pitches:
+                        print "ERROR: grace pitch", p, "is in pitches of", this
+                if orn.trill_pitches:
+                    for p in orn.grace_pitches:
+                        if p in orn.trill_pitches:
+                            print "ERROR: grace pitch", p,
+                            print     "is in trill_pitches of", this
+                if orn.ignore_pitches:
+                    for p in orn.grace_pitches:
+                        if p in orn.ignore_pitches:
+                            print "ERROR: grace pitch", p,
+                            print     "is in ignore_pitches of", this
+            if orn.ignore_pitches:
+                for p in pitches:
+                    if p in orn.ignore_pitches:
+                        expected = expected - 1
+
+
+    def add_note(pitch, optional time_span_ = 0):
+        if pitch in pitches:
+            print "WARNING: Cevent.add_note trying to add pitch that is already";
+            print     " in the Cevent.pitches: "; to_string(), "adding", pitch
+            return
+        pitches.append(pitch)
+        time_span = time_span_
+        compute_expected()
+
+
+    def to_string():
+        var orn_str = ""
+        var orn = ornaments
+        if orn:
+            if orn.trill_pitches:
+                orn_str = " tr" + str(orn.trill_pitches)
+            if orn.grace_pitches:
+                orn_str = orn_str + " gr" + str(orn.grace_pitches)
+            if orn.ignore_pitches:
+                orn_str = orn_str + " ig" + str(orn.ignore_pitches)
+        "<Cevent time " + str(time) + " " + repr(pitches) +
+            " " + repr(time_span) + orn_str +
+            " ex" + str(expected) + ">"
+
+
+    def add_ignore_pitches(ignore):
+        // print "add_ignore_pitches", id(ignore)
+        if ornaments:
+            var ip = ornaments.ignore_pitches
+            if ip:
+                for p in ignore:
+                    if p in ip:
+                        print "WARNING: Cevent.add_ignore_pitches trying to add";
+                        print     " pitch already in Cevent.ornaments.";
+                        print     "ignore_pitches: "; to_string(), "adding", p
+                        print "  (This is normal if two trills are adjacent.)"
+                    else:
+                        // ignore_pitches can be shared across ornaments, so
+                        // you can't append to it unless you first copy it:
+                        ornaments.ignore_pitches = ip.copy()
+                        // display "ADD1", time, ornaments.ignore_pitches,
+                        // display     id(ornaments.ignore_pitches)
+            else:
+                ornaments.ignore_pitches = ignore
+                // display "ADD2", time, ornaments.ignore_pitches, 
+                // display     id(ornaments.ignore_pitches)
+        else:  // install a new Ornaments 
+            ornaments = Ornaments(nil, nil, ignore)
+        compute_expected()
+
+
+    def add_trill_pitches(pitches):
+    # add pitches to ornaments.trill_pitches
+        if ornaments:  // update existing ornaments object
+            if ornaments.trill_pitches:
+                for p in pitches:
+                    if p in ornaments.trill_pitches:
+                        print "ERROR: Cevnet.add_trill_pitches trying to add";
+                        print     " pitch already in Cevent.ornaments.";
+                        print     "trill_pitches: "; to_string(), "adding", p
+                    else:
+                        ornaments.trill_pitches.append(p)
+            else:
+                ornaments.trill_pitches = pitches
+        else:  // install a new Ornaments 
+            ornaments = Ornaments(pitches, nil)
+        compute_expected()
+
+
+    def add_grace_pitches(pitches):
+    # add pitches to ornaments.grace_pitches
+        if ornaments:  // update existing ornaments object
+            if ornaments.grace_pitches:
+                ornaments.grace_pitches = ornaments.grace_pitches + pitches
+            else:
+                ornaments.grace_pitches = pitches
+        else:  // install a new Ornaments 
+            ornaments = Ornaments(nil, pitches)
+        compute_expected()  // expected does not change, but check consistency
+
+
+
+class Cell:
+    var value
+    var used
+    var time
+    var trill_time
+    var unused_count
+
+    def init(v)
+        value = v
+        used = []
+        time = -1
+        trill_time = -1
+        unused_count = 0
+
+    def to_string():
+        "<Cell@" + str(time) + " val " + val2str(value) + " " + str(used) +
+        " " + str(unused_count) + " unused>"
+
+    def copy():
+        var c = Cell(value)
+        c.used = used.copy()
+        c.time = time
+        c.unused_count = unused_count
+        return c
+
+    def copy_from(c):
+        value = c.value
+        used = c.used.copy()
+        time = c.time
+        unused_count = c.unused_count
+
+
+
+// return value for both score following and accompaniment
+class Match_info
+    var pos          // index of matching event
+    var matches      // length of longest common subsequence
+    var match_stime  // score time of matched note
+    var est_stime    // current estimateed score time (this is not 
+                     //     match_stime even after a match because
+                     //     some smoothing and regression is used).
+    var speed        // score seconds per second based on regression
+
+    def init():
+        reset()
+        // est_stime = nil
+
+    def reset()
+        pos = -1
+        matches = 0
+        match_stime = -1
+        speed = nil
+
+    def isa_match(): match_stime > -1
+
+    def to_string()
+        if isa_match():
+            flatten(["<Match_info (matches) pos ", str(pos), " matches ", str(matches),
+                     " est_stime ", str(est_stime), " match_stime ",
+                     str(match_stime), " speed ", str(speed), ">"])
+        else:
+            flatten(["<Match_info (no match) pos", str(pos), 
+                     " speed ", str(speed), ">"])
+
+
+
+class Match_matrix:
+# The matrix considers each column to represent an input event and
+# each row to represent a score (compound) event. For the matrix,
+# row 1 corresponds to the first score event (ref_track[0]). The
+# full matrix is never stored. Instead, we only store a range of
+# rows from the previous input event and a range for the current
+# input event. This class implements an abstraction where we can
+# access column data by matrix row number, allowing an arbitrary
+# range of rows to be mapped to a zero-based array representation.
+#
+# Since the first score (compound) event corresponds to row 1 of
+# the matrix, we say the matrix index is 1-based, although we
+# actually define a row 0 of the matrix to implement boundary
+# conditions for the dynamic programming calculations.
+#
+# Both columns represent a range of rows.  For the current column,
+# this runs from win_start (1-based) - 1 up to but not
+# including win_end (also 1-based). The reason for win_start - 1
+# is that in computing the current column, we need to access the
+# previous row. The total range has size win_half_len * 2 + 1.
+#
+# As score following proceeds, the range of rows considered must
+# advance. The advance is achieved by setting win_center (1-based)
+# to the previous match location + 1, expecting matching to
+# indicate progress in the score. win_start and win_end are
+# computed from win_center, respecting boundaries: zero and the
+# score length.
+#
+# In addition, when computing the current column, we must not
+# access outside of the rows in the previous column. The previous
+# column always contains the first rows of the current column, so
+# the only concern is that current column must not access beyond
+# the end of the previous column.
+#
+# To compute the next column, we swap cur_col and prev_col and
+# associated information. When initialized, we should first
+# compute cur_col. With the dynamic matcher, which processes
+# each note in a new column, we swap columns at the end of each
+# note computation (cur_col becomes prev_col) and so we just
+# compute cur_col for each note. With static matcher, we only
+# swap when there is a sufficient IOI to warrant a new input cevt.
+# Therefore the first thing we do on note input is check the IOI
+# for a new cevt and do a swap if we get a new cevt. (Otherwise,
+# we reuse but update cur_col based on the new note. But on the
+# first note, we get a new Cevt even though we have not yet
+# computed cur_col, so as a special case, we do NOT do a swap
+# on the first note even though we make a new cevt.
+#
+# To access row r of the current column, we use curcol(r), which
+# returns cur_col[r - curbase]. Since cur_col[0] represents row
+# win_start - 1, we have win_start - 1 - curbase = 0, or
+# curbase = win_start - 1.  prevbase is copied from curbase when
+# we swap columns.
+#
+# The Match_matrix is initialized and ready-to-go when accompaniment
+# starts. This means that it will be moved and re-initialized many
+# times, e.g. as preferences are loaded, user enables/changes cues,
+# etc.
+#
+# Data invariants and structure description:
+#
+# CEVTs are stored in ref_track. The Cevent corresponding to
+# matrix row k is at ref_track[k - 1]. The corresponding
+# Cell can be accessed using curcol(k) or prevcol(k).
+# 
+#                 Initial Matrix
+# CEVTs  Actual     0 <- curbase = 0
+#   0    Matrix     1 <- mm.win_start = 1, mm.win_center = 1
+#   1    Address    2     ^
+#   2               3     |  mm.win_half_len * 2 = 4
+#   3               4     v
+#   4                 <- mm.win_end = 5
+#   5     (This shows a window aligned with corresponding CEVTs row:           
+#   6          the matrix row index is 1 greater than the corresponding
+#   7          CEVTs (ref_track) index.)
+#   8     0 <- curbase = 9 (this is the window offset)
+#   9     1 <- mm.win_start = 10
+#  10     2     ^                  <- data here is mm.curcol(11)
+#  11     3     |  mm.win_half_len = 4
+#  12     4     v
+#  13     5 <- mm.win_center = 14 (corresponds to ref_track[13]
+#  14     6
+#  15     7
+#  16     8
+#  17       <- mm.win_end (not a valid index) = 17, winlen = 9
+#  18          (note: when this current column becomes the previous
+#  19           column, this mm.win_end is saved as prev_upper_bound
+#  20           before the new current window is repositioned and a
+#  21           new mm.win_end is computed from a new mm.win_center.)
+#           <- mm.length = 22 (length of ref_track)
+# 
+    var prev_col      // the previous column
+    var cur_col       // the column to construct
+    var length        // length of reference c_evt sequence
+    var win_half_len  // nominal window size / 2
+
+    var strategy      // strategy is 'static' or 'dynamic' or maybe others
+    var start_point   // what score event do we start with?
+    var win_center    // where we expect the match to be
+    var win_start     // win_center - win_half_len (but >= start_point)
+    var win_end       // win_center + win_half_len (but <= length + 1)
+    var prev_upper_bound // previous column's win_end
+    var cur_upper_bound // current column's win_end
+
+    var curbase       // cur_col[0] corresponds to matrix row curbase
+    var prevbase      // prev_col[0] corresponds to matrix row prevbase
+    // these are not zero-based but consider cur_col[0] to be at index curbase
+
+    var ready         // set to false when start_point or strategy change
+
+    // DEBUGGING: These variables are used if SFDBG or MATRIX_PRINT are non-nil
+    //     Note that fmm uses substantial storage: at least a window size array
+    //     per input note.
+    var fmm  // full match matrix containing column data after each input
+    var ismatch  // an array, one element per column, records if match was found
+    var inpitch  // an array, one element per column, records input pitch
+    var fmmcol  // current column under construction to be appended to fmm
+
+    def init(length_, strategy_):
+        if LOG_ROGER == true:
+            print "$$$$$$$$$$$$$$$$$$$ new match_mat $$$$$$$$$$$$$$$$$$$$$$$"
+        length = length_
+        # start_point = -999  // forces an update_to_start_point() call later
+        if strategy_ == 'static':
+            start_point = 1
+        if strategy_ == 'dynamic':
+            start_point = -999  // forces an update_to_start_point() call later
+        win_half_len = 10  // should be 30
+        print "WARNING win_half_len set to 10 for debugging"
+        var winlen = win_half_len * 2 + 1
+        if strategy_ == 'static':
+            win_start = 1
+            win_center = 1
+            win_end = min(win_center + win_half_len, length + 1)
+            cur_upper_bound = winlen
+            prev_upper_bound = winlen
+            curbase = win_start - 1
+            prevbase = curbase
+        // Ellie: Syntax error
+        // cur_col = array(winlen, 0)
+        // prev_col = array(winlen, SF_NINF)
+        cur_col = [0 for i = 0 to winlen]
+        prev_col = [SF_NINF for i = 0 to winlen]
+        strategy = 'static'
+        set_strategy(strategy_)
+        // ready is false (nil)
+        if SFDBG or MATRIX_PRINT:  // initialize DEBUGGING data recording:
+            fmm = []  // full match matrix, contains columns
+            ismatch = []  // records if column found match
+            inpitch = []  // records input pitch for each column
+
+
+    def set_strategy(s):
+        if s == strategy:
+            return
+        strategy = s
+        
+        if strategy == 'static':
+            for i = 0 to len(prev_col):  // set to large negative int
+                cur_col[i] = 0
+                prev_col[i] = SF_NINF    // aka "negative infinity"
+        elif strategy == 'dynamic':
+            // allocates a bunch of new Cell objects rather than sometimes
+            // re-initializing old ones just because it's simpler:
+            cur_col = [Cell(0) for i = 0 to len(cur_col)]
+            prev_col = [Cell(SF_NINF) for i = 0 to len(prev_col)]
+            cur_col[0].value = SF_NINF
+            prev_col[1].value = 0
+        else:
+            assert(false)
+
+
+    def update_to_start_point(start_point_, strategy_):
+    # make sure match_mat is initialized, has the right strategy 
+    # and window placement is correct
+        if not ready:
+            strategy = nil  // force (re)initialization
+        if strategy != strategy_:
+            set_strategy(strategy_)
+        if LOG_ROGER == true:
+            print "$$$$$$$$$$$$$$$$$$ update_to_start_point $$$$$$$$$$"
+        // note that the window may have moved from the start point and we just
+        // want to reset the window position, so it is an error to test if
+        // start_point != start_point_. Instead we must test the actual current
+        // window position correctness as follows:
+        if win_start != start_point_:
+            print "$$$$$$$$$$$$$$$$$$ REALLY update_to_start_point $$$$$$$$$$"
+            if ready:
+                print "+++++++++++++++++++++++ note: ready is true +++++++++++++++"
+            start_point = start_point_
+            win_start = start_point_
+            win_center = start_point_
+            win_end = min(length + 1, win_center + win_half_len)
+            prev_upper_bound = win_end
+            curbase = win_start - 1
+            prevbase = curbase
+        ready = true
+
+
+    def got_input(pitch)
+        if SFDBG or MATRIX_PRINT:
+            // [win_start, nil, nil, nil, ...]
+            // we will copy curcol to fmmcol but starting from
+            // index 1
+            fmmcol = array(win_start)
+            fmmcol[0] = win_start
+            inpitch.append(pitch)
+
+
+    def got_result(result):
+        if SFDBG or MATRIX_PRINT:
+            ismatch.append(result.matches if result.isa_match() else nil)
+            for rk = win_start to win_end:
+                fmmcol.append(curcol(rk).value)
+            fmm.append(fmmcol)
+
+
+    def swap():
+        var temp = prev_col
+        prev_col = cur_col
+        cur_col = temp
+        
+        temp = prevbase
+        prevbase = curbase
+        curbase = temp  // probably we do not need to preserve curbase
+                        // because the window will be moved and reinitialized
+        temp = prev_upper_bound
+        prev_upper_bound = cur_upper_bound
+        cur_upper_bound = temp  // probably do not need this either
+
+        if LOG2 == true:
+            display "swap", prevbase, curbase, prev_upper_bound, cur_upper_bound
+
+
+    def update_win(center):
+        win_center = center
+        win_start = max(start_point, win_center - win_half_len)
+        win_end = min(length + 1, win_center + win_half_len)
+        // display "update_win", win_start, win_center, win_end
+        // print "$$$$$$$$$$$$$$$$$$ update_win", center, "$$$$$$$$$$$$$$$$$$$$"
+        if ready:
+            print "++++++++++++++++++++++++++ ready is true+++++++++++++++"
+        ready = false
+
+
+    def curcol(i): cur_col[i - curbase]
+    def set_curcol(i, x): cur_col[i - curbase] = x; return x
+
+    def prevcol(i): prev_col[i - prevbase]
+    def set_prevcol(i, x): prev_col[i - prevbase] = x; return x
+
+
+    def pitch_string_for_row(ref_track, r):
+    # compute first label column for each row. Show a pitch if possible.
+        if (r - 1) >= 0 and (r - 1) < len(ref_track):
+            var cevt = ref_track[r - 1]
+            var sep = ""
+            var ps = ""
+            for pitch in cevt.pitches:
+                ps = ps + sep + str(pitch) 
+                sep = ","
+            if cevt.ornaments:
+                if cevt.ornaments.trill_pitches:
+                    sep + "_"
+                    for pitch in cevt.ornaments.trill_pitches:
+                        ps = ps + sep + str(pitch)
+                        sep = ","
+                if cevt.ornaments.grace_pitches:
+                    sep + "_"
+                    for pitch in cevt.ornaments.grace_pitches:
+                        ps = ps + sep + str(pitch)
+                        sep = ","
+            return ps
+        elif r == -1:
+            return "BASE"
+        else:
+            return "    "
+
+
+    def save_matrix(ref_track):
+        print "--------------------------------------------------"
+        display "save_matrix", len(ref_track)
+        print "save_matrix:", len(fmm), "input notes, center on time",
+        print     MATRIX_PRINT;
+        if len(fmm) > 0:
+             print ", Cevent count", len(fmm.last()) - 1
+        else:
+            print "not saving -- no matrix to save"
+            return
+        var outf = open("matrix.txt", "w")
+        var rows = len(fmm.last())
+
+        var pitch_strings = []
+        var ps_width = len("PITCHES")  // at least wide enough for heading
+        for r = 1 to rows:
+            var pitch_string = pitch_string_for_row(ref_track, r)
+            pitch_strings.append(pitch_string)
+            ps_width = max(ps_width, len(pitch_string))
+        var left_width = ps_width + 11  // width of row#, pitches, time, space
+
+        outf.write(leftpad("COLUMN NUMBER: ", left_width))
+        for c = 0 to len(fmm):
+            outf.write(leftpad(str(c), 4))
+        outf.write("\n")
+
+        outf.write(leftpad(" MAX ATTAINED: ", left_width))
+        for c = 0 to len(fmm):
+            if ismatch[c]: outf.write(leftpad(str(ismatch[c]), 4))
+            else: outf.write("  __")
+        outf.write("\n")
+
+        outf.write("ROW " + leftpad("PITCHES", ps_width) + " TIME  ")
+        for c = 0 to len(fmm):
+            outf.write(leftpad(str(inpitch[c]), 4))
+        outf.write("\n")
+
+        for r = 1 to rows:
+            outf.write(leftpad(str(r), 3) + " ")  // row number
+            outf.write(leftpad(pitch_strings[r - 1], ps_width) + " ")  // pitches
+            outf.write(subseq(pad(str(ref_track[r - 1].time), 5), 0, 5) + " ")
+            for col in fmm:
+                if len(col) > r:
+                    var val = col[r]
+                    if isnumber(val):
+                        if val < -99: val = "    "
+                        elif val > 999: val = " inf"
+                    elif not val: val = "    "
+                    outf.write(leftpad(str(val), 4))
+                else:
+                    outf.write("    ")
+            outf.write("\n")
+
+        ###########################
+        # now write window around MATRIX_PRINT time to console
+        ###########################
+
+        // first find the row:
+        r = 0
+        while r < len(ref_track) and ref_track[r].time <= MATRIX_PRINT:
+            r = r + 1
+        // first_row, last_row are matrix row numbers, so add 1 to r:
+        r = r + 1  // now r is the matrix row (1-based), fmm columns
+                   // can be accessed by matrix index because window
+                   // offset is in fmmcol[0]
+        var first_row = max(r + 1 - MATRIX_WIDTH, 1)
+        var last_row = min(r + MATRIX_WIDTH, len(ref_track)) + 1
+        display "matrix", last_row, len(ref_track)
+        // find high score in first row to identify column
+        argmax = Argmax()
+        for c at i in fmm:
+            if len(c) > r:
+                argmax.item(i, c[r] or -99)
+        var center = argmax.result
+        if not center:
+            print "Could not find a matrix row corresponding to time ";
+            print     MATRIX_PRINT; ", try a different value."
+            print "Maximum score time is "; ref_track.last().time; "."
+            print "--------------------------------------------------"
+            return
+        var first_col = max(0, center - MATRIX_WIDTH)
+        var last_col = min(len(fmm), center + MATRIX_WIDTH)
+
+        // scores can easily reach 3 digits, but for display and analysis
+        // it cuts line length to use 2 digits, so we bias the scores to
+        // get reasonably-sized printouts into 2 digit scores. Use the
+        // low score in the printed cells to decide the bias:
+        var bias = 100000
+        for r = first_row to last_row:
+            for c = first_col to last_col:
+                col = fmm[c]
+                if len(col) > r and isnumber(col[r]) and col[r] > 0:
+                    bias = min(bias, col[r])
+        bias = max(0, idiv((bias - 10), 10) * 10)  // round number
+
+        var colbias = idiv(first_col, 50) * 50
+
+        if bias > 0 or colbias > 0:
+            print "Cell values are shown decreased by", bias;
+            print     ", column index decreased by", colbias
+
+        // figure out how many columns we need for cevts, which will print
+        // in the format p1,p2,p3_tt1,t2_g1, where pn is a chord pitch, tn
+        // is a trill pitch and gn is a grace note pitch. Trailing "_" are
+        // omitted
+        pitch_strings = []
+        ps_width = len("PITCHES")  // at least wide enough for heading
+        for r = first_row to last_row:
+            pitch_string = pitch_string_for_row(ref_track, r)
+            pitch_strings.append(pitch_string)
+            ps_width = max(ps_width, len(pitch_string))
+        left_width = ps_width + 11  // width of row#, pitches, time, space
+
+        print leftpad("COLUMN NUMBER: ", left_width);
+        for c = first_col to last_col:
+            print leftpad(str(c - colbias), 3);
+        print
+
+        print leftpad(" MAX ATTAINED: ", left_width);
+        for c = first_col to last_col:
+            if ismatch[c]: print leftpad(str(ismatch[c] - bias), 3);
+            else: print " __";
+        print
+
+        print "ROW " + leftpad("PITCHES", ps_width) + " TIME  ";
+        for c = first_col to last_col:
+            print leftpad(str(inpitch[c]), 3);
+        print
+
+        for r = first_row to last_row:
+            print leftpad(str(r), 3),  // row number
+            print leftpad(pitch_strings[r - first_row], ps_width),
+            print subseq(pad(str(ref_track[r - 1].time), 5), 0, 5), // time
+            for c = first_col to last_col:
+                col = fmm[c]
+                if len(col) > r:
+                    val = col[r]
+                    if isnumber(val):
+                        val = val - bias
+                        if val < -99: val = "   "
+                        elif val > 999: val = "inf"
+                    elif not val: val = "   "
+                    print leftpad(str(val), 3);
+                else:
+                    print "   ";
+            print
+        print "--------------------------------------------------"
+        
+
+
+class Score_follower:
+    var ref_track  // an array of compound events (cevts),
+                   // each of which is a time and array of pitches
+    var epsilon  // this epsilon is used for grouping performance
+    // notes for the static matcher. It is 0.075 sec by default
+    // (set in epsilon.srp), but this can be changed with a label
+    // at time 0. This epsilon does not change during the performance.
+    // Note that for grouping score notes into Cevents, epsilon can
+    // change as a function of score time (in seconds) using labels.
+    // This applies to score note grouping for both dynamic and static
+    // matchers.
+    var static_threshold
+    var match_mat
+    var strategy
+    var report
+    var current_cevt
+    var cevt_count
+    var new_cevt_flag
+    var input_count  // counts number of performance notes received
+    var last_evt_time
+    var top_score
+    var top_row  // where is the top_score achieved?
+    var last_max_pos
+    var last_top_score
+    // var start_point  // normally 1, where in the ref_track do we start?
+    var dmc  // dynamic match credit - credit for matching a note
+    var dcm  // cost of missing notes/chords
+    var dce  // cost of extra notes/chords
+    var dgc  // dynamic grace note credit - credit for matching a grace note
+    // var dcw - dynamic cost of wrong notes (no diagonal rule to use this)
+    // var smc - static match credit - credit for matching a note (implicitly 1)
+    var scm  // static cost of missing notes
+    var sce  // static cost of extra notes
+    var scw  // cost of wrong notes (static matcher)
+    var oowcell  // out-of-window cell -- used by dynamic matcher,
+                 //   substitutes for prevcol(i) when i is out of bounds
+
+
+    def init(rt, rc, labels):  // reference track and reference channel
+        epsilon = get_epsilon(0)  // only for static matcher
+        print "Initial epsilon is", epsilon * 1000, "msec"
+        // print "labels", labels
+        static_threshold = 0.5
+        report = 0 // 0: global, 1: partial
+        cevt_count = 0
+        new_cevt_flag = false
+        input_count = 0
+        start_point = 1
+        dmc = 2  // dynamic match credit - credit for matching a note
+        dgc = 1  // dynamic grace note credit - credit for matching a grace note
+        dcm = 2  // cost of missing notes/chords
+        dce = 1  // cost of extra notes/chords
+        // smc = 1  // static match credit - credit for matching a note
+        scm = 1  // static cost of missing notes
+        sce = 0  // static cost of extra notes
+        scw = 1  // cost of wrong notes (static matcher)
+
+        ref_track = ref_to_cevts(rt, rc, labels)
+        // show_ref_track()
+
+        match_mat = Match_matrix(len(ref_track), 'static')
+        oowcell = Cell(SF_NINF)
+        last_evt_time = -999
+        last_max_pos = -1
+        top_score = 0
+        last_top_score = 0
+        top_row = 0
+        input_count = 0
+
+
+    def show_ref_track():
+        for cevt in ref_track:
+            print cevt
+
+
+    def ref_track_len():
+        len(ref_track)
+
+
+    def set_win_half_len(whl):
+        match_mat.win_half_len = whl
+        match_mat.win_start = 1
+        match_mat.win_end = min(len(ref_track), 1 + whl)
+        match_mat.win_center = 1
+
+
+    # returns nil if no match, otherwise score time (seconds) of matching event
+    def handle_input(time, pitch, m_info):
+        if LOG3 == true:
+            print "*** handle_input()", time, pitch, m_info, "***"
+            print_a_column("@@@ CUR_COL", match_mat.cur_col, match_mat.curbase)
+        var center = match_mat.win_center
+        // Disable assert        
+        // if input_count == 0 and not match_mat.ready:
+        //     display "handle_input", input_count, match_mat.ready
+        //     assert(false)
+        // mark match_mat as no longer ready to begin accompniment
+        match_mat.ready = false
+        input_count = input_count + 1
+        // display top_score
+        if strategy == 'static':
+            static_match(time, pitch, m_info)
+            if new_cevt_flag:
+                if (top_score > last_top_score) and
+                   (m_info.pos > last_max_pos):
+                    center = m_info.pos + 1
+                    new_cevt_flag = false
+                elif (m_info.pos == last_max_pos) and
+                     (top_score > last_top_score):
+                    center = m_info.pos + 1
+        elif strategy == 'dynamic':
+            // display "before dynamic_match", center, match_mat.win_start
+            dynamic_match(time, pitch, m_info)
+            // display "after dynamic_match", top_score, last_top_score,
+            // display     m_info.pos, last_max_pos, center
+            if (top_score > last_top_score) and
+               (m_info.pos > last_max_pos):
+                center = m_info.pos + 1
+            elif (m_info.pos == last_max_pos) and 
+                 (top_score > last_top_score):
+                center = m_info.pos + 1
+            else:  // it would be more correct to advance according to the number of
+                   // notes in the c_evts rather than 1 full c_evt per input.
+                center = center + 1
+        match_mat.update_win(center)
+        if report == 0:
+            last_top_score = max(last_top_score, top_score)
+        else:
+            last_top_score = top_score
+        last_max_pos = max(last_max_pos, m_info.pos)
+        // display "last_max_pos in score_follower", last_max_pos
+
+
+    def filter_trill_notes(notes, label):
+    # remove pitches in notes between label.start and label.stop that
+    # match a pitch in label.data
+        // display "filter_trill_notes", label
+        if len(notes) == 0:
+            print "ERROR: no notes found in reference track!"
+            return
+        var i = 0
+        var note = notes[0]
+        while note.time < label.stop:
+            if note.time >= label.start and notes[i].key in label.data:
+                // print "  filter_trill_notes removing", notes[i].to_string()
+                notes.uninsert(i)
+            else:
+                i = i + 1
+            if i >= len(notes):
+                return
+            note = notes[i]
+
+
+    def filter_grace_notes(notes, label):
+        if len(notes) == 0:
+            print "ERROR: no grace note pitches in", label
+            return
+        if label.data[0] == "insert":
+            return  // "insert" is specified: no pitches are removed
+        var j = 0
+        var i = 0
+        while i < len(notes):
+            var note = notes[i]
+            if note.time >= label.start and note.key == label.data[j]:
+                if note.time > label.start + 1:
+                    print "WARNING: removing grace note";
+                    print     " found more than 1 sec after label time:"
+                    print     "    note removed:", note.to_string()
+                    print     "    directed by label:", label
+                display "filter_grace_notes", note, i
+                notes.uninsert(i)
+                j = j + 1
+                if j >= len(label.data):
+                    return
+            else:
+                i = i + 1
+        print "ERROR: only found first", j, "grace notes in", label
+
+
+    def filter_chord_notes(notes, label):
+        var i = 0
+        while i < len(notes) and notes[i].time < label.start:
+            i = i + 1
+        # search and remove chord tones starting at i
+        for pitch in label.data:
+            var j = i
+            while j < len(notes) and notes[i].key != pitch:
+                j = j + 1
+            if j >= len(notes):
+                print "ERROR: did not find chord pitch", pitch,
+                print      "in reference track as specified in", label
+            else:
+                notes.uninsert(j)
+
+
+    def last_cevt_before(cevts, time):
+    # return the index of the last cevt in cevts before time
+        var j = -1
+        for cevt at i in cevts:
+            if cevt.time > time:
+                return j
+            j = i
+        return j
+
+
+    def report_skip_short_note(note, next):
+        short_note_skip_count = short_note_skip_count + 1
+        if SHOW_SKIPS:
+            print "WARNING: Skipped short repeated (duplicated) note: "
+            print "    "; note.to_string()
+            print "         which played again here "
+            print "    "; next.to_string()
+
+
+    def ref_to_cevts(rt, rc, labels):
+    # transfer reference track to cevts, select only channel rc
+    # rc == 0 means all channels
+        // display "ref_to_cevts", len(rt), rc
+        var cevts = []
+        var cevt_start_time
+        last_evt_time = -999
+        var filtered = []
+
+        # filter notes in reference track
+        for note in rt:
+            if isinstance(note, Alg_note) and (rc == 0 or note.chan + 1 == rc):
+                filtered.append(note)
+
+        # take out trill and grace notes; set grace_max_ioi, trill_max_ioi
+        trill_max_ioi = nil
+        max_grace_ioi = nil
+        for label in labels:
+            if label.command == 'trill':
+                filter_trill_notes(filtered, label)
+            elif label.command == 'grace':
+                filter_grace_notes(filtered, label)
+            elif label.command == 'chord':
+                filter_chord_notes(filtered, label)
+            elif label.command == 'trill_max_ioi':
+                if trill_max_ioi:
+                    print "WARNING: trill_max_ioi is set more than once in"
+                    print "    labels, using the value", label.data[0], "msec."
+                trill_max_ioi = label.data[0]
+            elif label.command == 'grace_max_ioi':
+                if grace_max_ioi:
+                    print "WARNING: grace_max_ioi is set more than once in"
+                    print "    labels using the value", label.data[0], "msec."
+                grace_max_ioi = label.data[0]
+        trill_max_ioi = (trill_max_ioi or 350) / 1000
+        grace_max_ioi = (max_grace_ioi or 350) / 1000
+        display "After processing labels", trill_max_ioi, grace_max_ioi
+
+        short_note_skip_count = 0
+        for note at i in filtered:
+            // get epsilon for this note time
+            epsilon = get_epsilon(note.time)  // epsilon is in sec
+            // display "ref_to_cevts", note.time, last_evt_time, epsilon
+            var skip_this = false
+            if note.dur < 0.02:  // see if note repeats within short time
+                var j = i + 1
+                while j < len(filtered) and 
+                      filtered[j].time < note.time + 0.02 and
+                      filtered[j].key != note.key:
+                    j = j + 1
+                skip_this = j < len(filtered) and 
+                            filtered[j].time < note.time + 0.02 and
+                            filtered[j].key == note.key
+            if skip_this:
+                report_skip_short_note(note, filtered[i])
+                // skip note, so no update to last_evt_time
+            elif note.time > last_evt_time + epsilon:
+                cevt_start_time = note.time
+                cevt = Cevent(note.time)
+                cevt.add_note(note.key)
+                cevts.append(cevt)
+                last_evt_time = note.time
+            else:  // add pitch to cevt with exception for duplicate
+                if note.time > cevts.last().time + epsilon:
+                    display "TIMEGAP", note.to_string(), cevts.last(), epsilon, cevt_start_time, last_evt_time
+                cevts.last().add_note(note.key, note.time - cevt_start_time)
+                last_evt_time = note.time
+        last_evt_time = -999  // re-initialize just to be safe
+
+        if not SHOW_SKIPS and short_note_skip_count > 0:
+            print "WARNING: Skipped", short_note_skip_count,
+            print "short repeated (duplicated) notes."
+            print "    Use -s/--showskips to see them."
+
+        # update cevts with graces notes, chords, and trill notes:
+        // make chords first in case we need them to attach trill or grace notes
+        for label in labels:
+            if label.command == 'chord':
+                // put the chord notes in an new Cevent
+                i = last_cevt_before(cevts, label.start) + 1
+                cevts.insert(i, Cevent(label.start))
+                for pitch in label.data:
+                    cevts[i].add_note(pitch)
+
+        for label in labels:
+            // display "2nd label loop", label
+            if label.command == 'trill':
+                // put the trill notes in an existing or new Cevent:
+                i = last_cevt_before(cevts, label.start)
+                j = i + 1  // where to insert the ornament
+                if i >= 0 and cevts[i].time >= label.start - 0.05  // within
+                    j = i
+                    // remove pitches from chord at j, since the chord is
+                    // *before* the trill label and therefore pitches were
+                    // not removed earlier by filter_trill_notes:
+                    for p in label.data:
+                        cevts[j].pitches.remove(p)
+                elif j < len(cevts) and cevts[j].time < label.start + 0.025:
+                    nil // j is i + 1
+                else:  // no chord nearby, so make a new one, j is i + 1
+                    cevts.insert(j, Cevent(label.start))
+
+                # add trill notes to everything in label range (starts at j)
+                while j < len(cevts) and cevts[j].time < label.stop:
+                    // display "add_trill_pitches", i, j, cevts[j], label
+                    cevts[j].add_trill_pitches(label.data)
+                    // after the first cevt with trill, ignore trill pitches
+                    if j > i:
+                        cevts[j].add_ignore_pitches(label.data)
+                    // display "after add trill_pitches", j, cevts[j], label
+                    j = j + 1
+                
+                if j < len(cevts):  // ignore trill notes on the *next* cevt too
+                    // display "add_ignore_pitches", i, j, cevts[j], label
+                    cevts[j].add_ignore_pitches(label.data)
+
+            elif label.command == 'grace':
+                // put the grace notes in an existing Cevent
+                i = last_cevt_before(cevts, label.start) + 1
+                var pitches = label.data
+                if label.data[0] == "insert":
+                    cevts.insert(i, Cevent(label.start))
+                    pitches = subseq(label.data, 1)
+                cevts[i].add_grace_pitches(pitches)
+
+        return cevts
+
+
+    def eps_test(evt_time):
+        // test if event time is grouped in a new cevt
+        var result = evt_time - last_evt_time > epsilon
+        last_evt_time = evt_time
+        return result
+
+
+    def cevt_match(rk):
+    # determine if the current_cevt (performance) matches chord at index rk
+        var perf_tot = len(current_cevt.pitches)
+        var perf_in = 0
+        for pitch in current_cevt.pitches:
+            if pitch in ref_track[rk - 1].pitches:
+                perf_in = perf_in + 1
+        perf_out = perf_tot - perf_in
+        return (perf_in - perf_out) / perf_tot >= static_threshold
+
+
+    def get_total_expected_notes():
+    # Sums the 'expected' property from every Cevent in the ref_track.
+        var total_expected = 0
+        for cevt in ref_track:
+            total_expected = total_expected + cevt.expected
+        return total_expected
+
+
+    // returns a Match_info with pos, matches and match_stime
+    //
+    def static_match(time, pitch, result):
+        if LOG1 == true:
+            display "<<< static_match()", time, pitch, result
+        // print time
+        if eps_test(time)  // is this note epsilon later than previous note?
+            if LOG3 == true:
+                print "new cevent"
+            current_cevt = Cevent(time)
+            if strategy == 'static':
+                match_mat.swap()
+            if strategy == 'dynamic':
+                if cevt_count > 0:  // initially, Match_mat is set up for first Cevt
+                    // after first Cevt, we need to advance to next column:
+                    match_mat.swap()
+            cevt_count = cevt_count + 1
+            new_cevt_flag = true
+        current_cevt.add_note(pitch)
+        var mm = match_mat
+        mm.curbase = mm.win_start - 1  // position window properly
+        if mm.curbase > 0: // we need to have curcol(0).value == 0
+            // but after that, indexing below win_start returns SF_NINF, and
+            // the pitches array and time don't matter since the value is so low
+            mm.set_curcol(mm.curbase, SF_NINF)
+        if LOG3 == true:
+            display mm.win_start, mm.win_end, len(mm.cur_col), mm.curbase
+
+        # Calculate scores within a sliding window of the conceptual 
+        # score vs. performance matrix.  Iterate through each relevant
+        # score event row (rk) within the current window 
+        # (for rk = mm.win_start to mm.win_end).  For each cell (rk, 
+        # current performance event), calculate the best possible alignment
+        # score (r) by considering three ways to arrive at this cell:
+        for rk = mm.win_start to mm.win_end:
+            # Vertical Move: Coming from the cell above (mm.curcol(rk - 1)). 
+            # This corresponds to skipping the score event rk. 
+            # A penalty (scm) is applied: r = mm.curcol(rk - 1) - scm.
+            var r = mm.curcol(rk - 1) - scm
+            if LOG2 == true:
+                display "loop", rk, r, mm.prev_upper_bound, mm.cur_upper_bound
+
+            if rk < mm.prev_upper_bound
+                # Horizontal Move: Coming from the cell to the left in the
+                # previous column (mm.prevcol(rk)).
+                # This corresponds to skipping the current performance event 
+                # (i.e., the performance event is considered "extra"). 
+                # A penalty (sce) is applied. The score is updated if this
+                # path is better: r = max(r, mm.prevcol(rk) - sce). 
+                # (This is only considered if rk is within the bounds of the
+                # previous column, rk < mm.prev_upper_bound).
+                r = max(r, mm.prevcol(rk) - sce)
+                if LOG2 == true:
+                    display '    #1', rk, r, mm.prevcol(rk)
+                if LOG3 == true:
+                    if rk == 1:
+                        print_a_column("@@@ cur", match_mat.cur_col, match_mat.prevbase)
+                        print_a_column("@@@ prev", match_mat.prev_col, match_mat.prevbase)
+
+            if rk - 1 < mm.prev_upper_bound:
+
+                # Diagonal Move: Coming from the cell diagonally
+                # up-left (p = mm.prevcol(rk - 1)).  This corresponds
+                # to matching (or mismatching) the current performance
+                # event (current_cevt) with the current score event
+                # (ref_track[rk - 1]).  The cevt_match(rk) function
+                # compares the performance Cevent and the score Cevent
+                # based on their pitch content and the
+                # static_threshold.  If they match, a credit
+                # (implicitly +1) is added to the score from the
+                # diagonal cell (1 + p).
+                // If they don't match, a penalty (scw) is subtracted
+                // (p - scw).
+                // r = max(r, (1 + p) if cevt_match(rk) else (p - scw)).  
+                // (This is only considered if rk - 1 is within the
+                // bounds of the previous column).
+
+                var p = mm.prevcol(rk - 1)
+                r = max(r, (1 + p) if cevt_match(rk) else (p - scw))
+                if LOG2 == true:
+                    display '    #2', rk, r, p, rk
+            // The best score r calculated from these three possibilities is
+            // stored in the current cell (mm.set_curcol(rk, r)).
+            mm.set_curcol(rk, r)
+            if LOG2 == true:
+                display "  match score", rk, r, top_score
+            if r > top_score:
+                result.match_stime = ref_track[rk - 1].time
+                result.pos = rk - 1
+                top_score = r
+                top_row = rk
+                result.matches = top_score
+                if LOG2 == true:
+                    display "   r > top_score", result.match_stime, result.pos, 
+                    display     top_score, result.matches 
+
+        // Store the index of the last score event row that was actually
+        // processed in this column calculation.
+        mm.cur_upper_bound = rk  // we set everything through rk-1
+
+        // print result
+
+
+    def dynamic_match(time, pitch, result):
+    # modified March 2024 (!): With piano, I think "double hits" are less
+    # than early work with acoustic-pitch-to-MIDI data, so there should
+    # be a penalty for extra notes. Here's a formulation using coefficients
+    # dmc = match credit (formerly 1), dcm = cost of missing notes (formerly 1),
+    # dce = cost of extra wrong notes (formerly 0).
+    #
+    # In this formulation, there is no diagonal rule: It would be simply to
+    # pay the dcm penalty for each unplayed note and picking up the dmc credit
+    # for matching a note in the next chord, but this is equivalent to the
+    # vertical rule (advance to the next chord, paying a penalty for unplayed
+    # notes in the current chord) plus the horizontal rule (get credit for
+    # matching a note). And if there is no match, we never had a diagonal
+    # rule that applied. The formulation is:
+    #
+    # Assign a value based on the cell to the left and the cell above,
+    # taking the maximum of the two values:
+    #
+    # Vertical Rule: Include the next chord from score, assuming no match to
+    # the performance note. Computes cell in row rk from cell in row rk-1.
+    #     From the cell above called curup, take
+    #     curup.value - curup.unused_count * dcm  (cost of missing notes)
+    # Since the cell at rk has not matched anything, we set pitches used to
+    # empty, set time to the event time for this column, and set unused_count
+    # to the number of pitches in this chord plus the number of trill_pitches
+    # for this chord (grace notes are not counted), which is conveniently
+    # stored in Cevent.expected for this row.
+    #     Grace notes: There is nothing special to do for grace notes in the
+    # vertical rule. There is no penalty to skip them, so they are not
+    # counted in the initial unused_count.
+    #
+    # Horizontal Rule: Match a yet-unmatched note in the chord, i.e., the
+    # performed note is grouped with the chord. The performed pitch must
+    # be in the chord and not in the used list. If there is a previous note,
+    # there is a timing constraint limiting the IOI with the previous note
+    # to 100 msec PLUS the time span of the chord. (See NOTE below.) The
+    # time constraint prevents grouping notes into a chord if the notes
+    # are far apart in time.
+    #     Ornaments: If a trill note is matched within 0.35 sec, count it as
+    # a match if it is unused. Ignore it otherwise. If a grace note is
+    # matched and unused, add dgc (grace note credit == 2). (See NOTE2 below)
+    #     From the cell to the left called prev
+    #     Match chord note:
+    #         If the pitch matches the chord and is not in prev.used
+    #             new value = prev.value + dmc  (add match credit)
+    #             new used = prev.used with pitch appended
+    #             expected = expected - 1 (we found an expected note)
+    #     Match a non-ignored trill note:
+    #         If the pitch matches a trill note and pitch not in ignore_pitches
+    #             If it is the first trill note (pitch is not in used)
+    #                 new value = prev.value + dmc (add match credit)
+    #                 new expected = expected
+    #                     (no penalty if missing, so not expected)
+    #                 new used = prev.used with pitch appended
+    #             else it is a repeated trill note (pitch is in used):
+    #                 new_value = prev.value (ignore note)
+    #                 new expected = expected
+    #                 new used = prev.used
+    #     Match an ignored trill note:
+    #         If the pitch matches a trill note and pitch in ignore_pitches
+    #             new_value = prev.value (ignore note)
+    #             new expected = expected
+    #             new used = prev.used
+    #     Match a grace note:
+    #         If the pitch matches a grace note and the pitch is not in
+    #         prev.used and no prev.used pitch is in the chord or trill pitches
+    #         (equivalent to all prev.used pitches in grace_pitches):
+    #             new value = prev.value + dgc  (add match credit)
+    #             new used = prev.used with pitch appended
+    #             expected = expected (not required or expected)
+    #             
+    # NOTE: The basis for timing is observing a rolled chord where the 
+    # top note was 0.184 sec later than the preceding note. The time span
+    # of the chord captures the idea of rolled chords where notes are not
+    # simultaneous. When chords are rolled more slowly in the score,
+    # larger IOIs are allowed to be grouped into the chord. An extra 0.1 sec
+    # is added because chords from notation systems often have a timespan of
+    # zero. 0.1 sec is quite generous because failing to match a correctly
+    # played note is bad. On the other hand, failures (false positive
+    # matches) can only occur when the note should *not* be grouped in
+    # the chord but the same note appears in the next chord in the score
+    # and should be matched to that chord.
+    # NOTE2: Grace notes should occur before other chord notes, so we add
+    # the constraint that for a grace note to match, the used list must
+    # contain only other grace notes. I.e. every pitch in used must be in
+    # grace_pitches. Grace notes do not have to be played in order to match.
+    # You could achieve strict ordering by creating a Cevent for each grace
+    # note, but then there would be no timing constraint between the grace
+    # notes or between the last grace note and the first chord note.
+    #     Boundary Conditions: In general, Col 0, representing a boundary
+    # before the first performed note, and Row 0, representing the
+    # state before the first chord, can have values of -INF, forcing
+    # the maximum value to come from the vertical or horizontal rule,
+    # whichever applies. The exception is Col 0, Row 1 must have a
+    # value of 0, so if the first note matches the first chord, the
+    # value for Row 1 Col 1 becomes 1. Similarly, Col 1, Row 0 must
+    # have a value of 0 so it the first note does NOT match, the
+    # vertical rule can result in a value of 0 for Col 1, Row 1.
+    # Since we only have windows on the theoretical full columns, there
+    # are also boundary conditions for missing vertical and horizontal
+    # values.  Missing values are -INF, forcing the cell to obtain a
+    # value horizontally or vertically.
+
+        if LOG1 == true:
+            display "<<< dynamic_match()", time, pitch, result
+
+        var mm = match_mat
+        mm.curbase = mm.win_start - 1  // position window properly
+        result.match_stime = -1  // no match
+
+        mm.got_input(pitch)  // for debugging
+
+        // Boundary condition for vertical rule at top of column window:
+        if mm.curbase == 0 and input_count == 1:
+            mm.curcol(0).value = 0
+        else:
+            mm.curcol(mm.curbase).value = SF_NINF
+
+        ### TODO: if track is empty, rk gets 0 and ref_track[rk - 1] 
+        ### TODO:     is out of bounds
+
+        // display "dm", mm.win_start, mm.win_end
+        for rk = mm.win_start to mm.win_end:
+            // initialize cur with the vertical rule (details above)
+            var cur = mm.curcol(rk)
+            var curup = mm.curcol(rk - 1)  // previous row of current column
+
+            if LOG2:
+                display " row", rk, cur
+                display "    ", curup
+
+            if rk > match_mat.start_point:
+                // display "vertical", rk, pitch, curup.value, curup.unused_count
+                cur.value = curup.value - dcm * curup.unused_count
+            else:
+                cur.value = curup.value
+
+            var cur_cevt = ref_track[rk - 1]
+            cur.used.clear()
+            cur.unused_count = cur_cevt.expected
+            if LOG2:
+                display "  after vertical rule", cur, cur.unused_count,
+                display     cur_cevt, cur_cevt.expected
+
+            // now apply the horizontal rule (details above)
+            var prev
+            var prev_unused_count  // need variable here for out-of-window cells
+            if (rk >= mm.prevbase and rk < mm.prev_upper_bound):
+                if input_count == 1 and rk == 1:  // special case for first cell
+                    prev = mm.curcol(0)  // there is a zero value here
+                    prev_unused_count = cur_cevt.expected
+                else:
+                    prev = mm.prevcol(rk) 
+                    prev_unused_count = prev.unused_count
+            else:
+                prev = oowcell
+                prev_unused_count = cur_cevt.expected
+
+            if LOG2:
+                display "    ", prev
+
+            // the horizontal rule has multiple cases, any of which could 
+            // result in updating cur, but the update is conditioned on
+            // getting a higher score than already produced by the vertical
+            // rule. To avoid a lot of duplicate update code, we just record
+            // some values we need for the update (if it happens) and then
+            // test for an update after all the cases are tested for. The
+            // values we need are:
+            var v = prev.value + dmc  // the candidate value for cur (Cell)
+            var match = false  // true iff the rule adds pitch to cur.used
+            var used = 0  // change to 1 if this rule matches the pitch
+            var new_time = time  // last match time to put in cur (Cell)
+            var report = false  // do not report trill and grace notes
+            // because their time is not correct; only report chord notes
+            if ((pitch in cur_cevt.pitches) and (pitch not in prev.used) and
+                ((len(prev.used) == 0) or
+                 // case 1: only grace notes have been played,
+                 //     so allowed time interval is larger:
+                 (time - prev.time < grace_max_ioi if 
+                      prev_unused_count == cur_cevt.expected
+                  else (time - prev.time < cur_cevt.time_span + 0.1)))):
+                // display "dynmatch", pitch, rk, ref_track[rk - 1].pitches,
+                // display     time, prev.time, prev.used, mm.prevbase
+                // v is already correctly set to prev.value + dmc
+                var orn = cur_cevt.ornaments
+                if orn and orn.ignore_pitches and (pitch in orn.ignore_pitches):
+                    v = prev.value
+                    // does not decrement expected, used == 0
+                else:
+                    report = true
+                    used = 1
+                match = true
+                // new_time is already correct
+            elif (cur_cevt.ornaments and cur_cevt.ornaments.trill_pitches and
+                  (pitch in cur_cevt.ornaments.trill_pitches) and
+                  ((len(prev.used) == 0) or
+                   (time - prev.time < trill_max_ioi))):
+                  if (pitch in prev.used) or
+                     (cur_cevt.ornaments and
+                      cur_cevt.ornaments.ignore_pitches and
+                      (pitch in cur_cevt.ornaments.ignore_pitches)):
+                      v = prev.value  // no credit after note is used
+                      // display "horiz match on trill", rk, cur_cevt.time, time,
+                      // display     pitch, v, top_score
+                      // match is already false
+                      // used is already 0
+                      // new_time is already time
+                  else:  // we have not received credit yet
+                      // v is already correctly set to prev.value + dmc
+                      // display "horiz match on trill", rk, cur_cevt.time, time,
+                      // display     pitch, v, top_score
+                      match = true
+                      used = 1
+                      // new_time is already time
+            elif (cur_cevt.ornaments and (pitch not in cur.used) and
+                  cur_cevt.ornaments.grace_pitches and 
+                  (pitch in cur_cevt.ornaments.grace_pitches) and
+                  ((len(prev.used) == 0) or
+                   (time - prev.time < grace_max_ioi))):
+                var beyond_grace_notes = nil
+                for p in prev.used:
+                    if p not in cur_cevt.ornaments.grace_pitches:
+                        beyond_grace_notes = true
+                if beyond_grace_notes:  // same as else clause: no match
+                    v = prev.value - dce
+                    new_time = prev.time
+                else:
+                    v = prev.value + dgc  // grace match credit
+                    match = true  // need to add pitch to used
+                    // used is already 0 -- grace notes are not in unused_count
+            else:
+                v = prev.value - dce  // pay cost of extra note
+                // match is already false
+                // used is already 0
+                new_time = prev.time  // chord time is unchanged
+                
+            // now we decide whether to apply the horizontal rule
+            if v > cur.value:
+                cur.value = v
+                cur.used = prev.used.copy()
+                cur.unused_count = prev_unused_count - used
+                cur.time = new_time
+                if match:
+                    cur.used.append(pitch)
+
+            // if LOG2 == true:
+            //    display "  match score", rk, cur.value, top_score
+
+            // is the a reportable match?
+            if cur.value > top_score and report:
+                result.match_stime = cur_cevt.time
+                result.pos = rk - 1
+                top_score = cur.value
+                top_row = rk
+                result.matches = top_score
+                # display "dynamic match", pitch, rk, cur.value, 
+                # display cur.used, ref_track[rk - 1].pitches, result
+                if LOG2 == true:
+                    display "  match score", rk, cur.value, top_score
+                    display "    r > top_score", result.match_stime,
+                    display     result.pos, top_score, result.matches
+
+        mm.cur_upper_bound = rk
+        # display "in dynamic_match", mm.cur_upper_bound
+
+        mm.got_result(result)
+
+        // print "dynamic_match: match_stime", result.match_stime, "pos",
+        // print     result.pos, "matches", result.matches
+        // DEBUGGING:
+#        print "****************** dynamic_match: ********************"
+#        var i1 = max(match_mat.win_start, match_mat.win_center - 5)
+#        var i2 = min(match_mat.win_center + 4, match_mat.win_end)
+#        for i = i1 to i2:
+#            print i; ":", pad(str(ref_track[i - 1].pitches), 24), "@";
+#            print     ref_track[i - 1].time,
+#            if i == match_mat.win_center:
+#                print "CENTER",
+#            cur = mm.curcol(i)
+#            display cur.value, cur.used,
+#            if i >= mm.prevbase and i < mm.prev_upper_bound:
+#                prev = mm.prevcol(i)
+#                display prev.value, prev.used
+#            else:
+#                print "no prev was computed"
+#        // ** MATCH SUMMARY: p57 @ 227.6, matched row 29 @ 21.3, top 53 row 298
+#        print "** MATCH SUMMARY: p"; pitch, "@", time;
+#        if result.isa_match():
+#            print     ", matched row", result.pos + 1, "@", result.match_stime;
+#        else:
+#            print     ", no match";
+#        print     ", top", top_score, "row", top_row,
+#        print     "center t-span", 
+#        if match_mat.win_center <= len(ref_track):
+#            print ref_track[match_mat.win_center - 1].time_span
+#        else:
+#            print "end of score"
+#        print "**************************************"
+#        
+#
+#        // for rk = mm.win_start - 1 to mm.win_end:
+#            // cur = mm.curcol(rk)
+#            // display "    ", rk, cur.value, cur.used, cur.time
+        
+        mm.swap()
+
+
+    def set_strategy(strategy_):
+        strategy = strategy_
+        match_mat.set_strategy(strategy_)
+        cevt_count = 0
+        new_cevt_flag = false
+        if LOG_ROGER == true:
+            print "========== created match_mat ============="
+
+
+    def set_start_point(stime):
+        # initialize to follow score starting at score time stime
+        var start_point = 1
+        while (start_point <= len(ref_track)) and
+              (ref_track[start_point - 1].time < stime):
+            start_point = start_point + 1
+        // display "***** set_start_point", start_point, len(ref_track)
+        if start_point > len(ref_track):
+            start_point = max(1, len(ref_track))
+            // display "***** set_start_point too big", start_point, len(ref_track)
+        // display "*****", ref_track[start_point - 1].time, stime
+        match_mat.update_to_start_point(start_point, strategy)
+        // print "$$$$$$$$$$$$$$$$$$$$$$ set_start_point", start_point, "ready",
+        // print         match_mat.ready, "$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+        // prepare to start accompaniment:
+        last_top_score = 0
+        last_max_pos = -1
+        last_evt_time = -999
+        top_score = 0
+        top_row = 0
+        input_count = 0
+
+
+    def print_a_column(msg, col, base):
+        print msg
+        display match_mat.win_start, match_mat.win_center, match_mat.win_end
+        for cell at i in col:
+            var row = base + i
+            if row >= match_mat.win_end:
+                return
+            if strategy == 'dynamic':
+                print row,
+                if row > 0:
+                    print ref_track[row - 1].time, 
+                    print cell.to_string(), ref_track[row - 1].pitches
+                else:
+                    print
+            elif strategy == 'static':
+                print row,
+                if row > 0:
+                    print ref_track[row - 1].time, cell,
+                    print ref_track[row - 1].pitches
+                else:
+                    print
+            else:
+                print row,
+                if row > 0:
+                    print ref_track[row - 1].time, ref_track[row - 1].pitches,
+                    print  "cell", "SF_NINF" if cell == SFNINF else cell,
+                    print "(unknown strategy)"
+                else:
+                    print
+
+
+    def print_cevents(start, stop, strack):
+    # print selected Cevents in ref_track. Also print notes in the unedited
+    # input track used to create ref_track
+        print "Cevents in reference track from", start, "to", stop, "sec"
+        var sti = 0  // strack index
+        while sti < len(strack) and strack[sti].time < start:
+            sti = sti + 1
+        // now sti is the first note after start
+        for cevt at i in ref_track:
+            if cevt.time > start and cevt.time < stop:
+                print i; ": "; cevt
+                var next_cevt_time = stop + 1
+                if i + 1 < len(ref_track):
+                    next_cevt_time = ref_track[i + 1].time
+                // print strack events that are in the range of cevt
+                while sti < len(strack) and strack[sti].time < next_cevt_time:
+                    if isinstance(strack[sti], Alg_note):
+                        print "    ", strack[sti].to_string()
+                    sti = sti + 1
+
+
+// the score_follower object does not exist yet, so the handler will be
+// a simple function
+# debug_menu.item("save_matrix", "save the match matrix as file", nil, nil,
+#                 'save_matrix')
+# 
+# 
+# // redirect the command to the score_follower object
+# def save_matrix(rest ignore):
+#     if accompanist and accompanist.score_follower:
+#         accompanist.score_follower.save_matrix()
+#     else: print "save_matrix: no score_follower object"
+# #endif
+
+
+# print "LOADED SCORE_FOLLOWER.SRP - COMPLETE"

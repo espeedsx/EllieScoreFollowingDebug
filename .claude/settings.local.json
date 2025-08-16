@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(del \"C:\\Repos\\EllieScoreFollowing\\src\\score_follower.srp\")"
+    ],
+    "deny": []
+  }
+}

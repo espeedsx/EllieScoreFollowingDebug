@@ -1,0 +1,134 @@
+# labels.srp -- read Audacity label file
+#
+# Roger B. Dannenberg
+# May 2025
+
+# read 3 columns, tab-separated, to get a list of Aud_label objects
+
+require "strparse"
+
+
+class Aud_label:
+    var start
+    var stop
+    var command  // a symbol
+    var data  // optional list of integer pitch values, can also contain
+              // "insert" when command is 'grace'
+
+    def init(start_, stop_, command_, data_):
+        start = start_
+        stop = stop_
+        command = command_
+        data = data_
+
+
+    def to_string():
+        var data_str = ""
+        if data:
+            data_str = ", " + str(data)
+        "<Audlabel " + str(start) + ", " + str(stop) + ", " + str(command) + 
+        data_str + ">"
+
+
+    def overlap(label2):
+    # overlap occurs if max(starttimes) < min(stoptimes)
+        max(start, label2.start) < min(stop, label2.stop)
+        
+
+
+def pitch_name_error(name):
+    print "ERROR: found invalid pitch", name, "in labels file."
+    return 0
+
+
+def pitch_name_to_int(name):
+# convert "c4" to 60, "cs4" or "c#4" to 61, "db4" or "df4" to 61
+    name = tolower(name)
+    if len(name) < 2:
+        return pitch_name_error(name)
+    var step = find("abcdefg", name[0])
+    if step == -1:
+        return pitch_name_error(name)
+    step = [9, 11, 0, 2, 4, 5, 7][step]
+    var loc = find("s#bf", name[1], 1)
+    if loc > -1:
+        step = step + (-1 if loc >= 2 else 1)  // flat or sharp
+        var octave = subseq(name, 2)  // remove all but octave
+    else:
+        octave = subseq(name, 1)  // remove all but octave
+    if octave == "" or not isdigit(octave):
+        return pitch_name_error(octave)
+    return step + 12 + int(octave) * 12
+
+
+def label_greater(x, y):
+    return x.start > y.start
+
+
+def sort_labels(labels):
+    labels.sort('label_greater')
+
+
+def read_labels(filename)
+    var reader = Readline(filename, true)
+    if not reader.inf
+        return "WARNING: read_labels could not open " + filename
+    var labels = []
+    var line = reader.readline()
+    while line:
+        if len(line) > 0 and line[0] != "#":  // skip comments
+            var p = String_parse(line)
+            var start = real(p.get_nonspace())
+            var stop = real(p.get_nonspace())
+            var command = intern(p.get_nonspace())
+            var data = nil
+            var item = p.get_nonspace()
+            // display "read_labels", start, stop, command, item, p.remainder()
+
+            while item != "":
+                if find(item, ".") > -1:  // convert float strings to floats
+                    item = real(item)
+                elif isdigit(item[0]):  // and int strings to ints
+                    item = int(item)
+                elif command in ['trill', 'grace', 'chord'] and // parse pitches
+                    // make exception for this special case:
+                    not (command == 'grace' and not data and item == "insert"):
+                    // item must be a pitch name, so convert it to int
+                    item = pitch_name_to_int(item)
+                // else: it could be that item is "insert" or other subcommand
+                if not data:
+                    data = []
+                data.append(item)
+                item = p.get_nonspace()
+            labels.append(Aud_label(start, stop, command, data))
+        // bottom of while loop to read lines:
+        line = reader.readline()
+    reader.close()
+    return labels
+
+
+
+def write_labels(filename, labels)
+# make an Audacity labels file
+    var outf = open(filename, "w")
+    if not outf:
+        print "ERROR: write_labels could not open", filename, "for writing."
+        return
+    for label in labels:
+        outf.write(str(label.start) + "\t" + str(label.stop) + "\t" +
+                   str(label.command))
+        for item in label.data:
+            outf.write(" " + str(item))
+        outf.write("\n")
+    outf.close()
+    return nil
+
+
+
+def print_labels(labels, optional msg):
+    var prefix = ""
+    if msg:
+        print msg
+        prefix = "    "
+    for label in labels:
+        print prefix; label

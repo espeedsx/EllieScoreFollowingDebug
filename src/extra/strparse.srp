@@ -1,0 +1,356 @@
+// String_parse class
+
+STRING_PARSE_SPECIAL_CHARS = ['_open_bracket_', '_close_bracket_',
+            '_open_brace_', '_close_brace_', '_comma_', '_colon_']
+
+class String_parse:
+    var string // the string
+    var pos    // the current position
+    var special_chars // an array of reserved tokens -- see get_token()
+
+    def init(s):
+        string = s
+        pos = 0
+        special_chars = STRING_PARSE_SPECIAL_CHARS
+
+    def get_alpha():
+        # skip space and return sequence of letters
+        skip_space()
+        var start = pos
+        while pos < len(string) and isalpha(string[pos]):
+            pos = pos + 1
+        return subseq(string, start, pos)
+
+    def get_real():
+        # return [+|-]<digits>[.<digits>][e[+|-]<digits>] as a string;
+        # if no digits are found, then return nil and do not modify
+        # current position
+        var original_pos = pos
+        var success = false
+        skip_space()
+        var start = pos
+        if len(string) - pos < 1:
+            pos = original_pos
+            return nil
+        if string[pos] == "-" or string[pos] == "+":
+            pos = pos + 1
+        while pos < len(string) and isdigit(string[pos]):
+            pos = pos + 1
+            success = true
+        if pos < len(string) and string[pos] == ".":
+            pos = pos + 1
+            while pos < len(string) and isdigit(string[pos]):
+                pos = pos + 1
+                success = true
+        // [e[+|-]<digits>]
+        if pos < len(string) and (string[pos] == "e" or string[pos] == "E"):
+            pos = pos + 1
+            success = false // until we find [+|-]<digits>
+            if pos < len(string) and (string[pos] == "-" or string[pos] == "+"):
+                pos = pos + 1
+            while pos < len(string) and isdigit(string[pos]):
+                pos = pos + 1
+                success = true
+        if success:
+            return subseq(string, start, pos)
+        else:
+            pos = original_pos
+            return nil
+
+    def get_integer():
+        # return [+|-]<digits> as a string; if no digits are found
+        # then return nil and do not modify the current position
+        var original_pos = pos
+        var success = false
+        skip_space()
+        var start = pos
+        if len(string) <= pos:
+            return nil
+        if string[pos] == "-" or string[pos] == "+":
+            pos = pos + 1
+        while pos < len(string) and isdigit(string[pos]):
+            pos = pos + 1
+            success = true
+        if success:
+            return subseq(string, start, pos)
+        else:
+            pos = original_pos
+            return nil
+
+    def get_char():
+        # return the next character, or nil at end of string
+        if pos == len(string):
+            return nil
+        pos = pos + 1
+        return string[pos - 1]
+
+    def get_alnum():
+        # skip space and return sequence of alphanumerics
+        skip_space()
+        var start = pos
+        while pos < len(string) and isalnum(string[pos]):
+            pos = pos + 1
+        return subseq(string, start, pos)
+
+    def get_csym():
+        # skip space and return a legal C language identifier
+        # must start with a letter or "_" and contains alphanumerics or "_"
+        skip_space()
+        var start = pos
+        if pos < len(string) and (isalpha(string[pos]) or string[pos] == "_"):
+            while pos < len(string) and (isalnum(string[pos]) or
+                                         string[pos] == "_"):
+                pos = pos + 1
+        return subseq(string, start, pos)
+
+    def get_nonspace():
+        # skip space and return any sequence of non-space characters
+        skip_space()
+        var start = pos
+        while pos < len(string) and not isspace(string[pos]):
+            pos = pos + 1
+        return subseq(string, start, pos)
+
+
+    def get_token():
+        # skip space and return a parsed serpent value or bracket or comma
+        #    or brace or colon
+        # note that '_open_bracket_', '_close_bracket_', '_open_brace_',
+        #    '_close_brace_', '_comma_', and '_colon_' cannot be parsed 
+        #    since they are reserved to denote these special characters
+        # If a token is not found, nil is returned. The original string
+        # position is restored.
+        var start = pos
+        skip_space()
+        // first try to get a real value
+        var c = get_real()
+        if c
+            if find(c, ".") >= 0
+                return real(c)
+            else
+                return int(c)
+        // not a number; look at first character and parse a token
+        c = get_char()
+        if not c
+            return nil
+        elif c == "'"
+            var token = get_delimited(c)
+            if len(token) > 0 and token.last() == c
+                return intern(subseq(token, 0, -1))
+        elif c == "\""
+            token = get_delimited(c)
+            if len(token) > 0 and token.last() == c
+                return subseq(token, 0, -1)
+        elif find("[]{},:", c) >= 0
+            return special_chars[find("[]{},:", c)]
+        else
+            pos = start
+            display "bad token", remainder()
+            return nil // e.g. a-z are not allowed as tokens
+
+    def get_value()
+        # skip space and return a parsed serpent value
+        var start = pos
+        var value = get_any_value()
+        if not value or value in special_chars
+            pos = start
+            return nil // error
+        return value
+
+    def get_any_value():
+        # skip space and return a parsed serpent value
+        # or a special_char symbol. This is a "private" method.
+        # Use get_value(), which is "public".
+        var value = get_token()
+        if not value
+            return nil
+        elif value == '_open_bracket_'
+            value = []
+            var elem = get_any_value()
+            while elem and elem != '_close_bracket_'
+                if elem == '_colon_'
+                    return nil // error
+                if elem and elem != '_comma_' // commas are optional!
+                    value.append(elem)
+                elem = get_any_value()
+            if elem != '_close_bracket_'
+                return nil
+            return value
+        elif value == '_open_brace_'
+            var dict = {}
+            var key = get_any_value()
+            while key and key != '_close_brace_'
+                value = get_any_value()
+                if value == '_colon_'
+                    value = get_any_value()
+                dict[key] = value
+                key = get_any_value()
+                if key == '_comma_'
+                    key = get_any_value()
+            if key != '_close_brace_'
+                return nil
+            return dict
+        return value // integer or real
+
+    def get_delimited(s, optional thru_s = t):
+        # return from current position through delimiter s, 
+        # or if thru_s is false, return from current position
+        # up to s. If s is not found, return remainder of string
+        var start = pos
+        pos = find(string, s, start)
+        if pos < 0 // s is not found
+            pos = len(string) // return whole string
+        elif thru_s // include s in the returned string
+            pos = pos + len(s)
+        return subseq(string, start, pos)
+
+    def get_delimited_quoted(s, optional thru_s = t):
+        # return from current position through delimiter s, 
+        # or if thru_s is false, return from current position
+        # up to s. If s is not found, return remainder of string
+        # If quote (") is encountered before delimiter s, 
+        # ignore the quote and return all characters until the
+        # next quote, skipping that quote too. Continue returning
+        # characters in this fashion until delimiter s is found.
+        # In this method, backslash (\) and two quotes together
+        # ("") are not treated specially. (But perhaps a future
+        # version of this library will.) If an unclosed quote is
+        # found, nil is returned.
+        var rslt = ""
+        var start = pos // where to begin collecting string of chars
+        while pos < len(string)
+            if string[pos] == "\""
+                pos = pos + 1
+                pos = find(string, "\"", pos)
+                if pos < 0 // no matching quote
+                    return nil
+                else
+                    pos = pos + 1
+                    rslt = subseq(string, start, pos)
+                    start = pos
+            elif find(string, s, pos) == pos // found delimiter
+                if thru_s:
+                    rslt = rslt + subseq(string, start, pos + len(s))
+                    pos = pos + len(s)
+                    return rslt
+            else:
+                pos = pos + 1
+        return rslt + subseq(string, start) // append rest of string
+
+
+    def get_nonspace_quoted(optional esc):
+        # gets non-space field, but allows quoted whitespace.
+        # If initial quote found, field ends with close quote.
+        # If not quoted, field ends with white space or quote.
+        # The backslash (\) is always considered an escape char.
+        # If esc is true, then two quotes together ("") are
+        # considered to be one embedded quote rather than a
+        # string terminator, e.g. "the quote ("") character"
+        # returns the string "the quote (") character" including
+        # the end quotes.
+        skip_space()
+        var result = ""
+        var quoted
+        if pos < len(string) and string[pos] == "\"":
+            quoted = true
+            result = "\""
+            pos = pos + 1
+        while pos < len(string) and (quoted or not isspace(string[pos])):
+            if string[pos] == "\"":
+                if quoted:
+                    if esc and 
+                       pos + 1 < len(string) and 
+                       string[pos + 1] == "\""
+                        // this is an escaped quotes
+                        pos = pos + 1
+                    else // this is the end of the string
+                        result = result + "\""
+                        pos = pos + 1
+                        return result
+                else // quote terminates input of nonspace field
+                     // quote remains in string as part of next field
+                    return result
+            if string[pos] == "\\":
+                pos = pos + 1
+            if pos < len(string):
+                result = result + string[pos]
+                pos = pos + 1
+        return result
+
+
+    def get_space():
+        # return space up to the end of string or non-space character
+        var start = pos
+        skip_space()
+        return subseq(string, start, pos)
+
+    def skip_space():
+        # skip over space, return nil
+        while pos < len(string) and isspace(string[pos]):
+            pos = pos + 1
+        return
+
+    def skip_over(s):
+        # skip ahead beyond s, returning true for success
+        var new_pos = find(string, s, pos)
+        if new_pos > -1:
+            pos = new_pos + len(s)
+            return true
+        return false
+
+    def skip(s):
+        # if we are positioned at s, skip and return true
+        if find(string, s, pos) == pos:
+            pos = pos + len(s)
+            return true
+        return false
+
+    def peek():
+        # return the next character in string, do not advance position
+        if pos < len(string):
+            return string[pos]
+        return nil
+
+    def remainder():
+        # return what is left in the string
+        return subseq(string, pos)
+
+    def remaining_len():
+        # return length of what is left in the string
+        return len(string) - pos
+
+escape_chars = ["\\n", "\\t", "\\\\", "\\r", "\\\"", "\\'"]
+
+def string_escape(str, quote):
+    # warning, this is an n^2 algorithm. See flatten.
+    var length = len(str)
+    var result = quote
+    for i = 0 to length:
+        if not isalnum(str[i]):
+            var special = find("\n\t\\\r\"'", str[i])
+            if special >= 0:
+                result = result + escape_chars[special]
+            else:
+                result = result + str[i]
+        else:
+            result = result + str[i] 
+    result + quote
+
+
+# x = String_parse("This is x23 (a test).")
+# print x
+# print x.get_alpha()
+# print x.get_alnum()
+# print x.get_alnum()
+# print x.skip("(")
+# print x.get_alnum()
+# print x.get_alnum()
+# print x.get_nonspace()
+# print x.get_alpha()
+
+# y = String_parse("1 2345 67.89 +1. -.234 'foo' ['hi'] ['there', 'is'] " + 
+#                  "[[1], [2]] {'a': 1, 'b': [3, 4, 5]}")
+# print y.remainder()
+# print y.get_value(), y.get_value(), y.get_value(), y.get_value()
+# print y.get_value(), y.get_value(), y.get_value(), y.get_value()
+# print y.get_value(), y.get_value(), y.get_value()

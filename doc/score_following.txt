@@ -1,0 +1,361 @@
+score_following.txt - notes on an improvement to score following
+
+26 March 2025 (last update May 2025)
+
+There are two problems with the current implementation:
+
+1. The window advances by one each time there is a wrong note,
+creating the possibility that dense chords advance the window by
+positions per chord. E.g. it takes only 4 8-note chords to advance by
+32 from the center to beyond the edge of a 60-cevt window.
+
+2. The current heuristic only allows notes to be grouped into matching
+a single cevt when the notes occur within a short time of the first
+matching note. So if the first match is spurious and a completely
+correct chord is played only 200ms later, *all* of the correct chord
+may be excluded by the heuristic because they came too late. An
+example is playing a very wrong chord and almost immediately
+correcting it. If the wrong chord happens to match only one note, it
+will set the cevt's time to the wrong-chord time, blocking any matches
+to the correct chord.
+
+To fix 1, we need to advance the window by one note in the window per
+input note rather than one chord per input note. A relatively easy way
+to do this is extend Cevent with a count variable and when building
+ref_track (the array of Cevents), assign count variables such that
+    ref_track[i].count = sum of ref_track[j].count for j in [0, i)
+When we center the window on a match, record two values:
+    match_cevt_count = ref_track[i].count (i is the matching cevt)
+    match_input_count = input_count (for the most recent input)
+Then, until the next match, we want to maintain:
+    input_count - match_input_count
+    ~= ref_track[window_center].count - match_cevt_count
+So, for example, advance the window when
+    ref_track[window_center + 1].count - match_cevt_count
+    < input_count - match_input_count
+
+To fix 2, the current rule is "a note matched to a non-empty cevt
+must occur within some delta time of the previous note." What if we
+could examine *all* notes that match a cevt and pick the largest
+number of notes that fall within an allowable time span? Then, a
+spurious match could not block all further matches that come later,
+and a *group* of notes (correct chord) that comes later could
+*replace* the spurious match and get a better score.
+
+To make this work, we need to keep matching notes and their times in a
+list on every cell, but we already have array Cell.used, so let's add
+a new field, matches, to contain *every* matching note (used or not)
+and stored as [time1, pitch1, time2, pitch2, ...].  We also need to
+know how many of these notes are considered to be matched (used), so
+we'll change used to be an integer (initially 0) representing how many
+input notes represent the best match. The current score is still
+stored in value, but to update (in the event of a match), first
+# remember the values before the update:
+    old_value = cell.value
+    old_used = cell.used
+    old_unused = idiv(len(cell.matches), 2) - old_used
+Then we can append a new match time and pitch to cell.matches.
+Then, we search cell.matches for the length of the longest sequence
+of consecutive inputs within the allowed time span (with duplicate
+pitches omitted).  Call it n.
+Then, we update the cell:
+    delta_used = n - old_used  // how many more matches do we get?
+    delta_unused = idiv(len(cell.matches), 2) - n - old_used
+            // how many more unused (wrong) notes do we have?
+    // incorporate changes into the value:
+    cell.value = old_value + delta_used * dmc - delta_unused * dce
+Probably there are simplifications here - I just wanted to make it
+as simple as possible.
+The first optimization is that there is no need to do anything new if
+the input pitch does not match anything in the chord, so just use the
+existing code for that path.
+The second optimization is to work backwards after appending to
+matches finding only the longest window ending in the last note. Since
+the input sequence is unchanged except for the last note that we just
+got, the only way we could improve over the existing longest window is
+by including the new note in a window. After finding the longest
+window working backward from the last (most recent) note, we can
+immediately compare to cell.used which has the length of the previous
+best window (we don't even care *which* notes are in the window
+because only the length affects the overall score.)
+
+If there is no match, the old code still applies: just subtract dce. 
+
+ 
+NEW OUT-OF-ORDER PROCESSING
+---------------------------
+
+Similar to current dynamic matcher, but instead of just the used list
+of pitches for the current chord, we keep a sequence of used lists:
+[[i h g][f e d][c b a] ...] going back in principle to the first
+chord, but since we have constraints on how far separated two chords
+can be and allow an out-of-order match, we can trim the tail of the
+sequence.
+
+To compute a column, the horizontal rule is applied as usual, but if
+- the perf note is not in the first used set of the list, and
+- it is in the chord but missing in a another used set and 
+- it meets timing restrictions
+then increment by 4 (2 points because we remove the -2 penalty for
+a missing chord note, and 2 points because we match the chord note).
+
+
+NEWER OUT-OF-ORDER PROCESSING
+-----------------------------
+
+Note that if we allow notes to be out of order, we do not need
+any special grouping of notes into chords. Or alternatively, we
+have an algorithm that can dynamically match notes to chords in
+any order, so why not just extend that beyond chords to allow
+matching any recent notes in any order?
+
+A problem is keeping track of what notes have been matched so that
+repeated notes must either match different notes or be considered
+extra notes. This algorithm uses a matrix row for each note in the
+score. As with the dynamic matcher, we keep a "state" in each cell
+of not only the match score but the notes that have been used. Now,
+this "used" state consists of not just the pitch of the current row
+but all previous pitches in the score. So there is boolean value --
+used or not used -- for each pitch. We do not allow new performance
+notes to match "backward in time" very far, so in practice that
+state consisting of all used notes can be abbreviated to only recent
+unmatched pitches we are allowed to match. There are various ways to
+deal with timing -- instead of boolean values, we can store the match
+time, or to reduce storage, we can use score timing to decide which
+earlier notes are matchable.
+
+The DP rules are similar to existing rules for the dynamic grouping
+matcher: The vertical rule says copy the state to the next row and
+decrease the match score by 2 if the current note is not matched.
+The horizontal rule says search from the current score note (row)
+back through earlier score notes looking for a match at a row that
+is not marked as already matched. If you match the score at the
+current row, increment the value by 2. If you match a score note
+from a previous row (out of order), increment by 4 (2 to undo the
+penalty for skipping it and 2 because it is now matched). Instead
+of incrementing by 4, you could charge an "out of order" penalty and
+increment by only 2 or 3.
+
+Is this algorithm better? It is a little more permisive, e.g. you
+could play notes in some very strange orderings that would probably
+never happen with only 2 hands. I assume each hand will play a part
+in order, but this algorithm would, for example, allow each hand to
+flip the order of any two notes that are close enough together.
+
+TRILLS AND ORNAMENTS
+--------------------
+
+Trills are similar to chords in that trill notes can be played in
+any order, and trill notes can span a significant duration like
+rolled chords, but unlike chords, trill notes can be played multiple
+times. Trills sometimes seem to extend through chords, but we can
+break trills at chord onsets to form a sequence of trills. Trill
+notes require a modification to the horizontal rule for the dynamic
+grouping algorithm.  First, trill notes must be labeled as such.
+Performance notes can match trill notes and receive 2 points (just
+like an ordinary chord tone) if the note is not "used" yet. Unlike
+chord notes, if the performed note is "used," it can still match,
+but the value is not updated (no penalty but no credit after the
+first match). For time constraints, the first match to a trill note
+in a chord must satisfy the same constraint as any other chord note.
+E.g., it must fall within some maximum IOI from the previous
+matching chord tone. After the first trill note in a chord is matched,
+the next match (whether "used" or not) must occur within the maximum
+trill note IOI of the previous trill note. (Repeated trill notes are
+allowed because in a soft trill, the other trill note may not sound,
+causing a repeated trill note with double the intended IOI. Therefore,
+the maximum trill note IOI should be something like 350 msec.)
+
+A consequence of this design is that trill notes are not "followed"
+and are basically ignored, but that is consistent with the idea that
+the speed and number of trill notes is not notated.
+
+Some ornaments like a grace note are optional and may be omitted, so
+they must be labeled as optional and the horizontal rule is they can
+be matched and "used," but there is no penalty for a missing note
+and small credit for a played note. Unlike trills, the note can only be
+"used" once, so a repeated grace note pitch will incur a penalty.
+
+Grace notes that are not optional can just be added to the chord.
+
+Grace notes can also be a figure with many notes, and where a pitch
+might occur more than once (consider a quick arpeggio up and back
+down). This case should be represented as a sequence of chords.
+Each chord will probably have one note. If the grace note is not
+required, it can be marked as a grace note and there will be no
+penalty if it is omitted (but no credit for matching).
+
+Finally, there are patterns like mordents that are essentially a
+combination of grace notes (optional) and trills (repeatable notes).
+
+Timing is tricky because grace notes and trills are spread out in
+time. What score time is reported and when? Let's report the score
+time at the time of the first chord note that produces a higher
+match value than previously seen, but no grace notes or trill notes
+(unless they are in the chord pitches) will generate a report.
+
+This means that trill notes can be included or not included in
+the reportable timings. See LABELING TRILLS AND GRACE NOTES below.
+
+HORIZONTAL RULE CASES
+---------------------
+1) match chord pitch: pitch is in chord, pitch is not used yet
+   To avoid matching a trill note in the next chord, possibly
+   resulting in a new high score and matching to the next chord,
+   trill pitches are added to ignore_pitches list of the *next*
+   chord after the end of the trill. That way, there is no
+   incentive to match to a trill note after the trill.
+     add pitch to used
+     add credit to value if pitch is not in ignore_pitches
+     subtract 1 from expected if pitch is not in ignore_pitches
+2) first trill pitch: pitch is in trill notes of a chord event  
+   and pitch is not in used set (gets credit, pitch is not in
+   ignore_pitches)
+     add pitch to used 
+     add credit to value  
+     subtract 1 from expected  
+3) second trill pitch: pitch is in trill notes of first chord event 
+   and the pitch is also in the used pitches set.
+     (no credit)
+4) continuation trill pitch: pitch is in trill notes of a
+   chord event that continues a trill (which means pitch is
+   also in ignore_pitches)
+     (no credit)
+5) grace note: pitch is in grace notes and not used yet. This
+   horizontal rule can only be applied if none of the used
+   notes is in the chord or in the trill, which would imply
+   we have moved past the trills:
+     add pitch to used
+     add credit to value 
+     (do not decrement expected - grace note is optional)
+
+From this, the following should hold:
+1) trill notes should not be in the chord
+2) trill notes extending beyond the first chord should be in
+     ignore_pitches to avoid credit for matching
+3) if the trill label starts before the first chord, the trill
+     notes go in ignore_pitches as if it is not first
+4) expected is the number of chord pitches not in ignore_pitches
+     plus the number of trill notes that are not in ignore_pitches.
+5) chord pitches, grace pitches and trill pitches are
+     non-intersecting.
+
+TRILL AND ORNAMENT REPRESENTATION AND IMPLEMENTATION
+----------------------------------------------------
+
+The Cevent class needs another field named "trill" which can hold
+another object with a "trill_pitches" variable. The Cell class needs
+a "trill_time" with the time of the last trill note.
+
+For grace notes, the object with "trill_pitches" also needs a
+"grace_pitch" and the Cell class yet needs another field with
+"unused_count" which is intialized to the length of the chord notes
+and the trill notes and decremented when any is matched. This number
+is used to compute the unused note penalty for the vertical rule.
+(Currently, we subtract the length of "used" from score's chord
+length, but now we can also put grace notes into "used" to prevent
+them from matching a second time, so the current expression:
+    len(ref_track[rk - 2].pitches - len(curup.used)
+will not compute the value we want. We could create a more complex
+computation that considers any trill notes and grace notes, but
+keeping a count is faster.)
+
+LABELING TRILLS AND GRACE NOTES
+-------------------------------
+
+Use Audacity labels:
+
+<time1><tab><time2><tab>epsilon <n>
+Cevents are formed by merging notes with IOIs of epsilon or less
+into chords. This label sets epsilon to <n> milliseconds from
+<time1> to the time of the next "epsilon" label. <time2> is ignored.
+
+<time1><tab><time2><tab>grace_max_ioi <n>
+Grace notes are constrained to be played within grace_max_ioi of
+each other and the first chord note.  This label sets grace_max_ioi
+to <n> milliseconds.  There should be only one specification of
+this value since it does not change during score following.
+Default is 350.
+
+<time1><tab><time2><tab>trill_max_ioi <n>
+Trill notes are constrained to be played within trill_max_ioi of
+each other or any chord note.  This label sets trill_max_ioi
+to <n> milliseconds.  There should be only one specification of
+this value since it does not change during score following.
+Default is 350.
+
+<time1><tab><time2><tab>trill <p1> <p2> ...
+This removes the notes <p1>, <p2>, ... from the score starting at 
+<time1> and extending to <time2>. After the Cevents are formed
+from the score, the trill notes are added to the Cevent starting
+up to 50 msec before <time1>. If there is no such Cevent, the trill
+notes are added to the Cevent starting within 25 msec after <time1>.
+If there is no Cevent there, a new empty Cevent is added at <time1>
+and the trill notes are added there. The trill notes are also added
+to any Cevent starting before <time2> and after the first Cevent
+with the trill notes.  If the trill label is before the chord,
+the trill notes are not reportable when they match. If after the
+chord, trill notes are also included in chord pitches and the
+first one played could be reported if that gets the value to a
+new level.
+
+<time1><tab><time2><tab>grace [insert] <p> ...
+If "insert" is not specified, this removes the pitches <p> ... from
+the score immediately after <time>. The pitches "<p> ..." should be
+listed in order and may include repetitions. Unless the optional
+"insert" keyword appears, the pitches are removed from the score,
+with search starting at time1. It is an error if the pitches are
+not found.  After the Cevents are formed, the pitches are
+added to "grace_pitches" for the first Cevent after <time1>. If
+there are grace notes that might be performed but are not in the
+reference score, the optional "insert" keyword should be used,
+which means the pitches are not removed from the score. Grace notes
+are notes that may *optionally* be performed. There is no penalty
+if they are not performed, but some credit is given if they *are*
+performed. The timing is flexible: the grace note can be matched
+if it occurs first or if it is within grace_max_ioi of any other
+note that is also matched by the chord. (This means that, if there
+is also a trill, the trill could continue for awhile and then a
+performed pitch could match a grace note if it was not matched
+earlier. This may not always make sense, but it offers some
+flexibility -- see Examples below.)
+
+<time1><tab><time2><tab>chord <p> ...
+This removes the pitches <p> ... from the score immediately after
+<time1>. All must be present in the score. After the Cevents are
+formed, a new Cevent with <p> ... is inserted at <time1>. This
+allows closely-spaced chords to be split into two or more chords.
+<time2> is ignored.
+
+Examples:
+
+An entire chord can be optional: use a "chord" label to create a
+chord with no notes. Then use "grace insert" to insert the optional
+notes. Grace notes are unordered and only need to occur within
+grace_max_ioi, so they can function as an "optional chord". Make
+sure the "grace insert" label starts immediately before the 
+"chord" label so that the grace notes will be attached to the
+inserted empty chord.
+
+A mordent can be performed like a trill but with an added "turn."
+E.g. the sequence might be G F E F G F G F G .... This is like a
+trill from F to G except for the lower neighbor E. You can add
+E as a grace note, which allows (and gives credit for) E if it
+is performed. But if it is done this way, performers can omit
+the E without penalty.
+
+
+Note that even though E is a grace note, it will be matched *after* G
+F, and the combination F G trill and E grace note could be performed
+(with credit) as F E G F G F ... or even F G F E F G F G ....
+Unfortunately, the performance would match and get credit (rather than
+a deserved penalty) for F G F G F G *E* F G ..., i.e., the E can be
+performed at any time (but only once without penalty).  The credit for
+a chord note is greater than the credit for a grace note, so if E is
+in the next chord, it will also match there and get a higher score,
+so generally, a spurious match to a grace note will not deflect the
+score follower from progressing to the next chord.  And in this case,
+if the performer plays the E as part of a mordent, the next E will
+receive a penalty at this chord, favoring the next match to a chord
+even more strongly.
+

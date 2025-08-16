@@ -1,0 +1,675 @@
+# test_common.srp
+#
+# Purpose: Provides common classes and functions used by score following
+#          test scripts (e.g., run_test.srp, run_bench.srp).
+#          Consolidates shared logic for MIDI file reading, track processing,
+#          running tests, and storing results.
+#
+# Evaluating score following: 
+#    number of confident matches (as percent)
+#    distribution of error in beats of confident matches
+#    distribution of number of beats between confident matches
+#        (beginning with the first onset after each match so that
+#        mere spacing between onsets does not add to the error)
+#    
+
+require "files"
+require "utils"
+require "pwl"
+require "histogram"
+require "mfwrite"
+require "labels"
+require "epsilon"
+
+ERROR_BINS = [-4096, -2048, -1024, -512, -256, -128, -64, -32, -16, -8, -4,
+              0, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+
+def write_label_file(output_path, label_lines):
+# NEW helper function to write label files
+    if not output_path or not isarray(label_lines) or len(label_lines) == 0:
+        return // Nothing to do
+    print "Writing", len(label_lines), "labels to", output_path
+    var outf = open(output_path, "w")
+    if not outf:
+        print "ERROR: Could not open", output_path, "for writing labels."
+        return
+    for line in label_lines:
+        outf.write(line + "\n")
+    outf.close()
+
+
+
+class Test_result
+    var total_count
+    var matched_note_count
+    var expected_note_count
+    var matched_percent
+    var matches  // array of Match, one for each reported match
+    var sseq  // score sequence
+    var pseq  // performance sequence
+    var spwl  // mapping from score time to beat
+    var ppwl  // mapping from performance time to beat
+    var error_hist  // histogram of error in reported matches (see below)
+    var gap_hist // histogram of gaps between correct matches (see below)
+
+    def init():
+        total_count = 0
+        matched_count = 0
+        matches = []
+
+
+
+    def compute_error_histogram(show, all_results_array, test_no, label_file_path)
+    # histogram of errors in milli-beats contains these bin breakpoints:
+    #     plus or minus: 4 8 16 32 64 128 256 512 1024 2048 4096
+    # for 24 bins total including <-4096 and >4096, where positive
+    # error means we matched later in the score than the correct place.
+    #
+    # to compute error, for each match, inverse map from time to beat and
+    # take beat difference
+        var error_header = false
+        error_hist = array(24, 0)
+        var error_label_lines = []
+        for match in matches:
+            var sbeat = spwl.lookup(match.stime)  // time to beat
+            var pbeat = ppwl.lookup(match.ptime)  // time to beat
+            // display "error", sbeat, match.stime, pbeat, match.ptime,
+            // display     pbeat - sbeat
+            var diff = (pbeat - sbeat) * 1000
+
+            // index 0: < -4096
+            // index 1: -4096 to -2048
+            // index 11: -4 to 0
+            // index 12: 0 to 4
+            // index 23: >= 4096
+            var index
+            if diff < 0:
+                if diff >= -4:
+                    index = 11
+                elif diff < -4096:
+                    index = 0
+                else:
+                    index = 12 - int(log2(-diff))
+            else:
+                if diff < 4:
+                    index = 12
+                elif diff >= 4096:
+                    index = 23
+                else:
+                    index = 11 + int(log2(diff))
+            if ERROR_MILLIBEATS and abs(diff) > ERROR_MILLIBEATS:
+                if not error_header:
+                    print "\nLarge Errors In Estimated Score Time for Match"
+                    print   "----------------------------------------------"
+                    error_header = true
+                print "score time", match.stime, "beat", sbeat,
+                print "performance time", match.ptime, "beat", pbeat
+                print "    diff time", ppwl.inverse(sbeat) - match.ptime,
+                print      "beats", sbeat - pbeat
+
+                # Create label line for this large error event
+                var start_time_str = str(match.stime)
+                var desc = str(sbeat) + " " + str(pbeat) + " " + str(pbeat - sbeat)
+                var label_line = str(match.stime) + "\t" + str(match.stime) + "\t" + "error " + desc
+                error_label_lines.append(label_line)
+
+            error_hist[index] = error_hist[index] + 1
+
+        write_label_file(label_file_path, error_label_lines)
+
+        var hist_row_data = {}
+        hist_row_data['no'] = test_no
+        # Extract first 5 buckets (indices 0-4)
+        hist_row_data['bucket_0'] = error_hist[0]
+        hist_row_data['bucket_1'] = error_hist[1]
+        hist_row_data['bucket_2'] = error_hist[2]
+        hist_row_data['bucket_3'] = error_hist[3]
+        hist_row_data['bucket_4'] = error_hist[4]
+        # Extract last 5 buckets (indices 19-23)
+        hist_row_data['bucket_19'] = error_hist[19]
+        hist_row_data['bucket_20'] = error_hist[20]
+        hist_row_data['bucket_21'] = error_hist[21]
+        hist_row_data['bucket_22'] = error_hist[22]
+        hist_row_data['bucket_23'] = error_hist[23]
+        all_results_array.append(hist_row_data)
+
+        # Define keys for the CSV header
+        var error_hist_keys = ['no', 'bucket_0', 'bucket_1', 'bucket_2', 'bucket_3', 'bucket_4',
+                                'bucket_19', 'bucket_20', 'bucket_21', 'bucket_22', 'bucket_23']
+        
+        # Write the accumulating results to the CSV file
+        writecsv(all_results_array, ERROR_HIST_PATH, error_hist_keys)
+
+        if error_header:
+            print "----------------------------------------------\n"
+        if show:
+            print "error histogram data:", error_hist
+            print "\nAlignment Error Histogram: estimated position -",
+            print     "correct position in millibeats:"
+            histogram_to_console(error_hist, ERROR_BINS, false)
+            print
+
+
+    def compute_gap_histogram(show, all_results_array, test_no, label_file_path):
+    # histogram of gaps between two matches, beginning with the first score
+    # note after the first match and measured in beats.
+    # histogram bin boundaries are: 1 2 3 4 5 6 7 8 9 10 11 12
+    #  for 13 bins total
+        gap_hist = Histogram(1, 12)
+        var gap_label_lines = []
+        var error_header = false
+        var prev_stime, prev_sti
+        var sti = 0  // score track index
+        for match in matches:
+            var stime = match.stime
+            var strack = sseq.tracks[0]
+            if prev_stime:  // always set except first time
+                // find first score location after prev_stime:
+                while sti < len(strack) and
+                      (not isinstance(strack[sti], Alg_note) or
+                       // at least 75 ms:
+                       strack[sti].time < prev_stime + 0.075):
+                    sti = sti + 1
+                if sti < len(strack):
+                    var start = strack[sti].time
+                    var start_beat = spwl.lookup(start)
+                    var stop_beat = spwl.lookup(stime)
+                    var gap = max(stop_beat - start_beat, 0)  // no negative gap
+                    if GAP_BEATS and GAP_BEATS < gap:
+                        if not error_header:
+                            print "\nLarge Gaps Between Matches"
+                            print   "--------------------------"
+                            error_header = true
+                        print gap; " from unmatched pitch "; strack[sti].key;
+                        print     " at score time "; start; " to "; match.pitch;
+                        print     " at "; stime
+
+                        # Create label line for this large gap event
+                        var desc = str(gap) + " " + str(strack[sti].key) + " " + str(match.pitch)
+                        var label_line = str(start) + "\t" + str(stime) + "\t" + "gap " + desc
+                        gap_label_lines.append(label_line)
+
+                    // increment histogram
+                    gap_hist.increment(gap)
+                elif within(prev_stime, stime, 0.001):  // probably last chord
+                    gap_hist.increment(0.0)
+                else:
+                    print "WARNING: could not find next score time after",
+                    print prev_stime, "s."
+                    print "    Track index", prev_sti, "track length",
+                    print     len(strack), "next match time", stime
+            prev_sti = sti
+            prev_stime = stime
+
+        write_label_file(label_file_path, gap_label_lines)
+
+        var gap_row_data = {}
+        gap_row_data['no'] = test_no
+        gap_row_data['bucket_0'] = gap_hist.counts[0]
+        gap_row_data['bucket_1'] = gap_hist.counts[1]
+        gap_row_data['bucket_2'] = gap_hist.counts[2]
+        gap_row_data['bucket_3'] = gap_hist.counts[3]
+        gap_row_data['bucket_4'] = gap_hist.counts[4]
+        gap_row_data['bucket_5'] = gap_hist.counts[5]
+        gap_row_data['bucket_6'] = gap_hist.counts[6]
+        gap_row_data['bucket_7'] = gap_hist.counts[7]
+        gap_row_data['bucket_8'] = gap_hist.counts[8]
+        gap_row_data['bucket_9'] = gap_hist.counts[9]
+        gap_row_data['bucket_10'] = gap_hist.counts[10]
+        gap_row_data['bucket_11'] = gap_hist.counts[11]
+        all_results_array.append(gap_row_data)
+
+        # Define keys for the CSV header
+        var gap_hist_keys = ['no', 'bucket_0', 'bucket_1', 'bucket_2', 'bucket_3', 'bucket_4',
+                                'bucket_5', 'bucket_6', 'bucket_7', 'bucket_8', 'bucket_9',
+                                'bucket_10', 'bucket_11']
+        
+        # Write the accumulating results to the CSV file
+        writecsv(all_results_array, GAP_HIST_PATH, gap_hist_keys)
+
+        if error_header:
+            print "--------------------------"
+        if show:
+            print "gap histogram data:", gap_hist.counts
+            print "Gap in beats between next possible match beat and",
+            print     "next actual match beat:"
+            gap_hist.show()
+            print
+
+
+    def write_warped_performance(path, score, perf):
+    # write a MIDI file that copies the performance but modifies the
+    # performance to have the tempo track of the score and the notes
+    # of the performance are timed according to the matched score notes
+    # with linear interpolation in between
+    # Algorithm:
+    #     Make a pwl from matches that maps performance time to score time
+    #     Modify copy of notes by mapping them according to pwl
+        var warped = perf.copy()
+        warped.map = score.map.copy()
+        var pwl = Pwl()
+        for match in matches:
+            pwl.append_xy(match.ptime, match.stime)
+        for note in warped.tracks[0]:
+            var onset = pwl.lookup(note.time)
+            if isinstance(note, Alg_note):
+                var offset = pwl.lookup(note.get_end_time())
+                note.dur = offset - onset
+            note.time = onset
+        allegro_smf_write(warped, path)
+        print "Wrote warped performance to", path
+
+
+def get_note_count(track):
+    var note_count = 0
+    for note in track:
+        if isinstance(note, Alg_note):
+            note_count = note_count + 1
+    return note_count
+
+
+
+def extract_track(name, seq):
+# Extracts the main musical track from an Alg_seq object.
+# Merges the tracks if more than one exists. 
+# Returns the merged track
+    print name
+    print "    track count:", len(seq.tracks)
+    for track in seq.tracks:
+        print "      track length", len(track);
+        print     ", note count", get_note_count(track)
+
+    assert(len(seq.tracks) > 0)
+    seq.merge_tracks()
+    var full_track = seq.tracks[0]
+    // select notes, removing updates, metadata, etc.:
+    track = [note for note in full_track if isinstance(note, Alg_note)]
+
+    print "    after merge and note selection"
+    print "      track length:", len(track), 
+    print     "note count:", get_note_count(track)
+
+    if LOG1 == true:
+        var i = 1
+        for note in track:
+            if isinstance(note, Alg_note) and i <= TOPX:
+                display i, note.time, note.key
+                i = i + 1
+
+    return track
+
+
+
+class Label:
+    var time
+    var bt
+
+    def init(time_, beat_type):
+        time = time_
+        bt = beat_type
+
+    def to_str():
+        "<Label " + str(time) + " " + str(bt) + ">"
+
+
+class Match:
+# Do not confuse this with Match_info in score_follower.srp!
+# general information about matches to facilitate analysis
+# for now, a Match only records score time and performance time
+    var stime  // time of match in score
+    var ptime  // time of match in performance
+    var pitch  // pitch that matched
+
+    def init(stime_, ptime_, pitch_):
+        stime = stime_
+        ptime = ptime_
+        pitch = pitch_
+
+    def to_str():
+        "<Match: stim" + str(stime) + " ptim " + str(ptime) + 
+        " pitch " + str(pitch) + ">"
+
+
+def get_labels(path):
+# add "_annotations" to the file name in the path and return array of Labels
+    path = file_change_suffix(path, "") + "_annotations.txt"
+    print "reading labels from", path
+    var inf = open(path, "r")
+    if not inf:
+        print "WARNING: Could not open labels in", path
+        return inf
+    var sp = String_parse("")
+    var line = inf.readline()
+    var labels = []
+    while line:
+        if issymbol(line) and line == 'NOTUTF8':
+            print "WARNING: Non-UTF-8 character ignored in", path
+        else:
+            sp.init(line)
+            var time = real(sp.get_nonspace())
+            sp.get_nonspace()  // skip 2nd field which duplicates first
+            // use get_alnum() so "b,,0" and "db,4/4" return "b" and "db":
+            var beat_type = sp.get_alnum()  // 'b', 'db', 'bR'
+            // display "get_labels", time, repr(beat_type)
+            labels.append(Label(time, intern(beat_type)))
+            // remaining characters in 3rd field are ignored
+        line = inf.readline()
+    inf.close()
+    return labels
+
+
+def labels_to_pwl(labels):
+# create a PWL from time to beat
+    var pwl = Pwl()
+    for label at i in labels:
+        pwl.append_xy(label.time, i)
+    return pwl
+
+
+def time_to_index(time, track, optional hint = 0):
+# find the smallest index i such that track[i] > time
+# assume i >= hint
+    for i = hint to len(track):
+        if track[i].time > time:
+            return i
+
+
+def check_alignment(strack, slabels, ptrack, plabels):
+# for positions at every decile, see if notes in the score match
+# notes in the performance. This is a sanity test to make sure
+# we 
+    var n = len(slabels)
+    var shint = 0
+    var phint = 0
+    var count = 0
+    var m = 0
+    for c = 0 to 10:
+        var i = c * max(1, idiv(n, 10))  // step by roughly n/10
+        // find index in strack and ptrack
+        var si = time_to_index(slabels[i].time, strack, shint)
+        var pi = time_to_index(plabels[i].time, ptrack, phint)
+        // now, strack around si should match ptrack around pi
+        // let's count how many of the next 5 notes of strack
+        // are found in the next 5 notes of ptrack
+        var spitches = []
+        var ppitches = []
+        var sj = si
+        while sj < len(strack) and len(spitches) < 5:
+            if isinstance(strack[sj], Alg_note):
+                spitches.append(strack[sj].key)
+            sj = sj + 1
+        var pj = pi
+        while pj < len(ptrack) and len(ppitches) < 5:
+            if isinstance(ptrack[pj], Alg_note):
+                var pkey = ptrack[pj].key
+                ppitches.append(pkey)
+                if pkey in spitches:
+                    count = count + 1
+            pj = pj + 1
+        // m is possible matches, which we take to be the minumum of
+        // the number of score pitches we can match and the number of
+        // performance pitches we look at
+        m = m + min(len(spitches), len(ppitches))
+        // print "score at", si, spitches, "perf at", pi, ppitches
+        shint = si
+        phint = pi
+
+    // now do the same, but offset performance by 5% so performance
+    // notes are taken from score positions after the positions for
+    // score notes -- this should give a much smaller number of matches
+    shint = 0
+    phint = 0
+    var count2 = 0
+    var m2 = 0
+    for c = 0 to 10
+        i = c * max(1, idiv(n, 10))
+        // find index in strack and ptrack
+        si = time_to_index(slabels[i].time, strack, shint)
+        pi = time_to_index(plabels[i + idiv(n, 20)].time, ptrack, phint)
+        // now, strack around si should match ptrack around pi
+        // let's count how many of the next 5 notes of strack
+        // are found in the next 5 notes of ptrack
+        spitches = []
+        ppitches = []
+        sj = si
+        while sj < len(strack) and len(spitches) < 5:
+            if isinstance(strack[sj], Alg_note):
+                spitches.append(strack[sj].key)
+            sj = sj + 1
+        pj = pi
+        while pj < len(ptrack) and len(ppitches) < 5:
+            if isinstance(ptrack[pj], Alg_note):
+                pkey = ptrack[pj].key
+                ppitches.append(pkey)
+                if pkey in spitches:
+                    count2 = count2 + 1
+            pj = pj + 1
+        // m is possible matches, which we take to be the minumum of
+        // the number of score pitches we can match and the number of
+        // performance pitches we look at
+        m2 = m2 + min(len(spitches), len(ppitches))
+        // print "score at", si, spitches, "perf at", pi, ppitches
+        shint = si
+        phint = pi
+
+
+    print "  "; count, "/", m, "matches found at 10 beat locations"
+    print "  "; count2, "/", m2, "matches found at non-corresponding locations"
+
+
+
+def compare_labels(title, track, labels):
+# see if times in labels match up with times in track. We print how
+# many distinct time points in the performance match to within 20 ms
+# of the label times. Notes less than 20 ms after the previous note
+# are ignored so we count score positions rather than notes.
+    var li = 0  // label index
+    var labels_len = len(labels)
+    var notes = [note for note in track if isinstance(note, Alg_note)]
+    var notes_len = len(notes)
+    var chord_len = 0  // number of time points (chords) in track
+    var match_count = 0
+    var note_time = -99
+    var TOLERANCE = 0.02  // seconds
+
+    if false:  // debug print beginnings of track and labels times
+        print "Some track and label times..."
+        for i = 0 to min(10, min(len(track), len(labels))):
+            print "    ", notes[i].time, labels[i].time
+    
+    // for each note, find the matching time in labels if any
+    for note in notes:
+        if note.time > note_time + TOLERANCE:
+            note_time = note.time
+            chord_len = chord_len + 1
+            while li < len(labels) and note_time > labels[li].time + TOLERANCE:
+                li = li + 1
+            if li < labels_len and
+               within(note_time, labels[li].time, TOLERANCE):
+                match_count = match_count + 1
+               
+    print "    found", match_count; "/"; chord_len, "on-beat matches in", title
+
+
+
+def score_path_to_labels_path(score_path):
+# given a path to a .mid file with the score, construct a path to
+# "midi_score_labels.txt".  The path will be in ../sfhints/ if the
+# midi_score file was in a path with "asap" (what we expect), but
+# otherwise, we read/write the _labels.txt file in the same directory
+# as midi_score.
+# ALGORITHM: we look in score_path for "asap" and then the "/" to
+# find the path within ../sfhints/.
+    var labels_path = file_change_suffix(score_path, "") + "_labels.txt"
+    var asap_loc = find(tolower(labels_path), "asap")
+    if asap_loc >= 0:  // now find "/" after "asap":
+        asap_loc = find(labels_path, "/", asap_loc)
+        if asap_loc >= 0:  // relocate path to ../sfhints/:
+            labels_path = "../sfhints" + subseq(labels_path, asap_loc)
+    return labels_path
+
+
+
+def get_sfhints_base_path_and_ensure_exists(score_path):
+# This function determines the target sfhints directory
+# and then ensures that directory exists.
+# It returns the directory path string (e.g., '../sfhints/composer/piece/').
+    var full_temp_path = score_path_to_labels_path(score_path)
+    var dir_path = file_name_from_path(full_temp_path, true)
+    if len(dir_path) > 0 and not isdir(dir_path):
+        print "Creating shared hint directory:", dir_path
+        var err = file_make_path(dir_path)
+        if isstring(err):
+            print "ERROR creating directory '", dir_path, "':", err
+            // Fallback to a simpler path if directory creation fails
+            return "../sfhints/"
+    return dir_path
+
+
+
+def get_label_file_path(score_path, label_filename):
+# Constructs a full, ready-to-use path for any given label file.
+    var base_dir = get_sfhints_base_path_and_ensure_exists(score_path)
+    return base_dir + label_filename
+
+
+
+def dump_unmatched_score_notes(result, score_path, score_notes):
+# result is the Test_result object
+# score_path is the ASAP path
+# score_notes is the list of Alg_note objects from the score
+    print "Attempting to dump unmatched score notes..."
+    var matched_score_events = {} // Using a dictionary as a set for "time:pitch" keys
+    for match_obj in result.matches:
+        // Ensure stime and pitch are valid before creating a key
+        if match_obj.stime != nil and match_obj.pitch != nil:
+             var key = str(match_obj.stime) + ":" + str(match_obj.pitch)
+             matched_score_events[key] = true
+
+    var unmatched_output_lines = []
+    for note in score_notes:
+        if isinstance(note, Alg_note):
+            // Ensure time and key are valid
+            if note.time != nil and note.key != nil:
+                var key = str(note.time) + ":" + str(note.key)
+                if not matched_score_events.get(key):
+                    unmatched_output_lines.append(str(note.time) + "\t" + str(note.time) + "\t" + "unmatched " + str(note.key))
+
+    if len(unmatched_output_lines) > 0:
+        var output_file_path = get_label_file_path(score_path, "unmatched_note_labels.txt")
+        print "Writing", len(unmatched_output_lines), "unmatched score notes to", output_file_path
+        var outf = open(output_file_path, "w")
+        if not outf:
+            print "ERROR: Could not open", output_file_path, "for writing unmatched notes."
+            return
+        for line in unmatched_output_lines:
+            outf.write(line + "\n")
+        outf.close()
+        print "Finished writing unmatched notes."
+
+
+
+# Runs the score follower for a single test case.
+# Reads score and performance MIDI, feeds performance notes to the follower,
+# and counts matches based on the specified strategy.
+#
+def run_test(score_path, perf_path, strategy):
+
+    print "----------------------------------------------------------"
+    display "run test", VERSION, strategy
+    display "        ", score_path
+    display "        ", perf_path
+
+    // slabels and plabels come from dataset score and performance annotations:
+    var slabels = get_labels(score_path)
+    var plabels = get_labels(perf_path)
+
+    // alabels (accompaniment labels) are hints used by score follower
+    // (see hcmp/doc/score_following.txt). hints are in ../sfhints/ using a
+    // directory structure that parallels that in asap if possible.
+    var labels_path = score_path_to_labels_path(score_path)
+    var alabels = []
+    // Check NOHINTS_MODE global variable to determine if hints should be ignored
+    if NOHINTS_MODE:
+        print "NOHINTS_MODE enabled: Ignoring labels from", labels_path
+    else:
+        alabels = read_labels(labels_path)
+        if isarray(alabels):
+            print "Read", len(alabels), "from", labels_path
+        else:  // string warning is returned; we'll make our own message:
+            print "No labels file:", labels_path, "not found."
+            alabels = []  // simplify by providing a default instead of nil
+    epsilon_init(alabels)
+
+    print "Analyzing on-the-beat notes in score and performance based on"
+    print "    analysis files (where give beat alignment):"
+    var sseq = allegro_smf_read(score_path)
+    var strack = extract_track("  Score MIDI", sseq)
+
+    compare_labels("score", sseq.tracks[0], slabels)
+
+    var pseq = allegro_smf_read(perf_path)
+    ptrack = extract_track("  Performance MIDI", pseq)
+    compare_labels("performance", ptrack, plabels)
+
+    print "  score has", len(slabels), "beat labels"
+    assert(len(slabels) == len(plabels))
+
+    // check that the nth labels denotes the same score positions
+    // this is just a sanity check - written to make sure I understood
+    // the structure of the annotation files
+    check_alignment(strack, slabels, ptrack, plabels)
+
+    var score_follower = Score_follower(strack, 0, alabels)
+    score_follower.set_strategy(strategy)
+
+    // var note_count = get_note_count(ptrack)
+    // use strack to calculate note count and matched percent
+    //   because strack and ptrack note counts can be quite different 
+    var note_count = get_note_count(strack)
+    var match_info = Match_info()
+    var note_index = 0
+
+    var result = Test_result()
+    result.sseq = sseq
+    result.pseq = pseq
+
+    result.spwl = labels_to_pwl(slabels)
+    result.ppwl = labels_to_pwl(plabels)
+
+
+    for note in ptrack:
+        if isinstance(note, Alg_note):
+            var note_time = note.time
+            var note_pitch = note.key
+
+            match_info.reset()
+            score_follower.handle_input(note_time, note_pitch, match_info)
+            if LOG1 == true:
+                display ">>> match result", note_index, note_time, note_pitch,
+                display     match_info.isa_match(), match_info.to_string()
+            
+            note_index = note_index + 1
+            if match_info.isa_match():
+                result.matches.append(Match(match_info.match_stime, note_time,
+                                            note_pitch))
+
+    if SFDBG or MATRIX_PRINT:
+        score_follower.match_mat.save_matrix(score_follower.ref_track)
+    
+    if CEVENTS_PRINT:
+        score_follower.print_cevents(CEVENTS_PRINT, CEVENTS_END_TIME, strack)
+
+    dump_unmatched_score_notes(result, score_path, strack)
+
+    result.total_count = note_count
+    result.matched_note_count = len(result.matches)
+    result.expected_note_count = score_follower.get_total_expected_notes()
+    result.matched_percent = 100 * result.matched_note_count / result.expected_note_count
+
+    print "Score following result"
+    print "  matched note count:", result.matched_note_count;
+    print     ", expected note count:", result.expected_note_count;
+    print     ", matched %:", result.matched_percent
+    return result
+

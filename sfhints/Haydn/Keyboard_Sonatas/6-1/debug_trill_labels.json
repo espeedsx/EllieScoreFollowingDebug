@@ -1,0 +1,3249 @@
+[
+  {
+    "label_start": 0.0,
+    "label_end": 0.0,
+    "label_text": "epsilon 50",
+    "checks": {
+      "text_valid": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 0.000-0.000 epsilon 50",
+      "Skipped: text does not contain 'trill'"
+    ],
+    "approx_start_measure": 0,
+    "approx_end_measure": 0
+  },
+  {
+    "label_start": 10.499,
+    "label_end": 11.374,
+    "label_text": "trill 76",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 10.499-11.374 trill 76",
+      "Filtered notes: 4, original count: 13",
+      "Unique pitches after filter: 2",
+      "Max gap between selected notes: 0.064s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 3,
+    "approx_end_measure": 4,
+    "expanded_start": 10.375,
+    "expanded_end": 11.374,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 4,
+      "unique_pitches": 2,
+      "pitch_counts": {
+        "75": 1,
+        "76": 3
+      },
+      "pair": [
+        75,
+        76
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0635416666666675
+    },
+    "subregions": [
+      {
+        "start": 10.375,
+        "end": 10.686458333333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 3, original count: 3",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 3
+        },
+        "pitch_counts": {
+          "75": 1,
+          "76": 2
+        }
+      },
+      {
+        "start": 10.75,
+        "end": 10.811458333333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "76": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 19.875,
+    "label_end": 22.374,
+    "label_text": "trill 81 57 61 83 80 62 79 64 78 77 56 71 69 68 67 66 65",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 19.875-22.374 trill 81 57 61 83 80 62 79 64 78 77 56 71 69 68 67 66 65",
+      "Filtered notes: 83, original count: 84",
+      "Unique pitches after filter: 11",
+      "Max gap between 79/81: 0.064s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 7,
+    "approx_end_measure": 8,
+    "expanded_start": 19.875,
+    "expanded_end": 22.374,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "alt_pair": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 83,
+      "unique_pitches": 11,
+      "pitch_counts": {
+        "81": 14,
+        "83": 5,
+        "80": 4,
+        "79": 12,
+        "78": 4,
+        "77": 4,
+        "57": 16,
+        "61": 4,
+        "62": 12,
+        "64": 4,
+        "56": 4
+      },
+      "pair": [
+        57,
+        79
+      ],
+      "pair_count": 28,
+      "max_gap": null
+    },
+    "subregions": [
+      {
+        "start": 19.875,
+        "end": 21.873958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 24, original count: 24",
+          "Unique pitches after filter: 2",
+          "Rejected: heuristics failed"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": true,
+            "has_pitch_counts": true,
+            "case2_two_pitches": false,
+            "case1_single_pitch": false
+          },
+          "filtered_note_count": 24,
+          "unique_pitches": 2,
+          "pitch_counts": {
+            "57": 16,
+            "79": 8
+          },
+          "pair": [
+            57,
+            79
+          ],
+          "pair_count": 24,
+          "semitone_apart": false
+        },
+        "pitch_counts": {
+          "57": 16,
+          "79": 8
+        }
+      },
+      {
+        "start": 21.9375,
+        "end": 21.998958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      },
+      {
+        "start": 22.0625,
+        "end": 22.123958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      },
+      {
+        "start": 22.1875,
+        "end": 22.248958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      },
+      {
+        "start": 22.3125,
+        "end": 22.373958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 22.375,
+    "label_end": 23.3379,
+    "label_text": "trill 61 57 67 62 65",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 22.885,
+    "adjusted_end": 23.363958333333333,
+    "messages": [
+      "Label 22.375-23.338 trill 61 57 67 62 65",
+      "Filtered notes: 25, original count: 25",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 77/79 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 8,
+    "approx_end_measure": 8,
+    "expanded_start": 22.375,
+    "expanded_end": 23.373958333333334,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 25,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "76": 1,
+        "77": 4,
+        "79": 4,
+        "57": 4,
+        "61": 4,
+        "56": 4,
+        "62": 4
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 8,
+    "adjusted_end_measure": 8,
+    "accepted": true
+  },
+  {
+    "label_start": 22.875,
+    "label_end": 23.374,
+    "label_text": "trill 77 56 62 79",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 22.885,
+    "adjusted_end": 23.363958333333333,
+    "messages": [
+      "Label 22.875-23.374 trill 77 56 62 79",
+      "Filtered notes: 16, original count: 16",
+      "Unique pitches after filter: 4",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 77/79 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation",
+      "Discarded: duplicate verified region"
+    ],
+    "approx_start_measure": 8,
+    "approx_end_measure": 8,
+    "expanded_start": 22.875,
+    "expanded_end": 23.374,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 16,
+      "unique_pitches": 4,
+      "pitch_counts": {
+        "77": 4,
+        "79": 4,
+        "56": 4,
+        "62": 4
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": true,
+    "adjusted_start_measure": 8,
+    "adjusted_end_measure": 8,
+    "accepted": true
+  },
+  {
+    "label_start": 24.1026,
+    "label_end": 24.624,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 24.135,
+    "adjusted_end": 24.613958333333333,
+    "messages": [
+      "Label 24.103-24.624 trill 71 72 73",
+      "Filtered notes: 17, original count: 18",
+      "Unique pitches after filter: 10",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 9,
+    "approx_end_measure": 9,
+    "expanded_start": 23.9626,
+    "expanded_end": 24.764,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 17,
+      "unique_pitches": 10,
+      "pitch_counts": {
+        "71": 4,
+        "72": 4,
+        "69": 1,
+        "81": 1,
+        "79": 1,
+        "78": 1,
+        "76": 1,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 9,
+    "adjusted_end_measure": 9,
+    "accepted": true
+  },
+  {
+    "label_start": 25.1013,
+    "label_end": 25.375,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 25.135,
+    "adjusted_end": 25.363958333333333,
+    "messages": [
+      "Label 25.101-25.375 trill 71 72 73",
+      "Filtered notes: 11, original count: 11",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 9,
+    "approx_end_measure": 9,
+    "expanded_start": 24.961299999999998,
+    "expanded_end": 25.498958333333334,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 11,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "71": 2,
+        "72": 2,
+        "69": 1,
+        "81": 1,
+        "62": 2,
+        "55": 1,
+        "59": 1,
+        "54": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 9,
+    "adjusted_end_measure": 9,
+    "accepted": true
+  },
+  {
+    "label_start": 26.7812,
+    "label_end": 27.374,
+    "label_text": "trill 76 78",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 26.80166666666667,
+    "adjusted_end": 27.363958333333333,
+    "messages": [
+      "Label 26.781-27.374 trill 76 78",
+      "Filtered notes: 14, original count: 14",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 76/78 occur 9 times and are close",
+      "Using 9 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 10,
+    "approx_end_measure": 10,
+    "expanded_start": 26.708333333333332,
+    "expanded_end": 27.374,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 14,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "79": 1,
+        "76": 5,
+        "78": 4,
+        "43": 1,
+        "55": 1,
+        "45": 1,
+        "57": 1
+      },
+      "pair": [
+        76,
+        78
+      ],
+      "pair_count": 9,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        76,
+        78
+      ]
+    },
+    "selected_pitches": [
+      76,
+      78
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 10,
+    "adjusted_end_measure": 10,
+    "accepted": true
+  },
+  {
+    "label_start": 28.226,
+    "label_end": 28.5911,
+    "label_text": "trill 79 77",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 28.26,
+    "adjusted_end": 28.613958333333333,
+    "messages": [
+      "Label 28.226-28.591 trill 79 77",
+      "Filtered notes: 13, original count: 13",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.043s",
+      "Accepted: pitches 79/77 occur 6 times and are close",
+      "Using 6 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 10,
+    "approx_end_measure": 10,
+    "expanded_start": 28.086,
+    "expanded_end": 28.623958333333334,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 13,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "79": 3,
+        "77": 3,
+        "76": 1,
+        "61": 1,
+        "64": 1,
+        "69": 2,
+        "62": 1,
+        "65": 1
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 6,
+      "max_gap": 0.04270833333333357,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 10,
+    "adjusted_end_measure": 10,
+    "accepted": true
+  },
+  {
+    "label_start": 29.2216,
+    "label_end": 29.5969,
+    "label_text": "trill 79 77",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 29.26,
+    "adjusted_end": 29.613958333333333,
+    "messages": [
+      "Label 29.222-29.597 trill 79 77",
+      "Filtered notes: 13, original count: 13",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.043s",
+      "Accepted: pitches 79/77 occur 6 times and are close",
+      "Using 6 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 11,
+    "approx_end_measure": 11,
+    "expanded_start": 29.081599999999998,
+    "expanded_end": 29.623958333333334,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 13,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "79": 3,
+        "77": 3,
+        "76": 1,
+        "61": 1,
+        "64": 1,
+        "69": 2,
+        "62": 1,
+        "65": 1
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 6,
+      "max_gap": 0.04270833333333357,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 11,
+    "adjusted_end_measure": 11,
+    "accepted": true
+  },
+  {
+    "label_start": 32.125,
+    "label_end": 32.624,
+    "label_text": "trill 71 72",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 32.135,
+    "adjusted_end": 32.613958333333336,
+    "messages": [
+      "Label 32.125-32.624 trill 71 72",
+      "Filtered notes: 16, original count: 17",
+      "Unique pitches after filter: 10",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 12,
+    "approx_end_measure": 12,
+    "expanded_start": 32.125,
+    "expanded_end": 32.764,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 16,
+      "unique_pitches": 10,
+      "pitch_counts": {
+        "71": 4,
+        "72": 4,
+        "69": 1,
+        "81": 1,
+        "79": 1,
+        "78": 1,
+        "76": 1,
+        "55": 1,
+        "59": 1,
+        "62": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 12,
+    "adjusted_end_measure": 12,
+    "accepted": true
+  },
+  {
+    "label_start": 33.1154,
+    "label_end": 33.374,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 33.135,
+    "adjusted_end": 33.363958333333336,
+    "messages": [
+      "Label 33.115-33.374 trill 71 72 73",
+      "Filtered notes: 8, original count: 8",
+      "Unique pitches after filter: 5",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 12,
+    "approx_end_measure": 12,
+    "expanded_start": 32.9754,
+    "expanded_end": 33.374,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 8,
+      "unique_pitches": 5,
+      "pitch_counts": {
+        "71": 2,
+        "72": 2,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 12,
+    "adjusted_end_measure": 12,
+    "accepted": true
+  },
+  {
+    "label_start": 34.7661,
+    "label_end": 35.374,
+    "label_text": "trill 76 78",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 34.80166666666666,
+    "adjusted_end": 35.363958333333336,
+    "messages": [
+      "Label 34.766-35.374 trill 76 78",
+      "Filtered notes: 14, original count: 14",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 76/78 occur 9 times and are close",
+      "Using 9 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 13,
+    "approx_end_measure": 13,
+    "expanded_start": 34.708333333333336,
+    "expanded_end": 35.374,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 14,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "79": 1,
+        "76": 5,
+        "78": 4,
+        "31": 1,
+        "43": 1,
+        "33": 1,
+        "45": 1
+      },
+      "pair": [
+        76,
+        78
+      ],
+      "pair_count": 9,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        76,
+        78
+      ]
+    },
+    "selected_pitches": [
+      76,
+      78
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 13,
+    "adjusted_end_measure": 13,
+    "accepted": true
+  },
+  {
+    "label_start": 46.6246,
+    "label_end": 47.499,
+    "label_text": "trill 76",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 46.625-47.499 trill 76",
+      "Filtered notes: 4, original count: 13",
+      "Unique pitches after filter: 2",
+      "Max gap between selected notes: 0.064s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 17,
+    "approx_end_measure": 17,
+    "expanded_start": 46.5,
+    "expanded_end": 47.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 4,
+      "unique_pitches": 2,
+      "pitch_counts": {
+        "75": 1,
+        "76": 3
+      },
+      "pair": [
+        75,
+        76
+      ],
+      "pair_count": 4,
+      "max_gap": 0.06354166666666572
+    },
+    "subregions": [
+      {
+        "start": 46.5,
+        "end": 46.811458333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 3, original count: 3",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 3
+        },
+        "pitch_counts": {
+          "75": 1,
+          "76": 2
+        }
+      },
+      {
+        "start": 46.875,
+        "end": 46.936458333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "76": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 56.0,
+    "label_end": 58.499,
+    "label_text": "trill 81 57 61 83 80 62 79 64 78 77 56 71 69 68 67 66 65",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 56.000-58.499 trill 81 57 61 83 80 62 79 64 78 77 56 71 69 68 67 66 65",
+      "Filtered notes: 83, original count: 84",
+      "Unique pitches after filter: 11",
+      "Max gap between 79/81: 0.064s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 21,
+    "approx_end_measure": 22,
+    "expanded_start": 56.0,
+    "expanded_end": 58.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "alt_pair": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 83,
+      "unique_pitches": 11,
+      "pitch_counts": {
+        "81": 14,
+        "83": 5,
+        "80": 4,
+        "79": 12,
+        "78": 4,
+        "77": 4,
+        "57": 16,
+        "61": 4,
+        "62": 12,
+        "64": 4,
+        "56": 4
+      },
+      "pair": [
+        57,
+        79
+      ],
+      "pair_count": 28,
+      "max_gap": null
+    },
+    "subregions": [
+      {
+        "start": 56.0,
+        "end": 57.998958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 24, original count: 24",
+          "Unique pitches after filter: 2",
+          "Rejected: heuristics failed"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": true,
+            "has_pitch_counts": true,
+            "case2_two_pitches": false,
+            "case1_single_pitch": false
+          },
+          "filtered_note_count": 24,
+          "unique_pitches": 2,
+          "pitch_counts": {
+            "57": 16,
+            "79": 8
+          },
+          "pair": [
+            57,
+            79
+          ],
+          "pair_count": 24,
+          "semitone_apart": false
+        },
+        "pitch_counts": {
+          "57": 16,
+          "79": 8
+        }
+      },
+      {
+        "start": 58.0625,
+        "end": 58.123958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      },
+      {
+        "start": 58.1875,
+        "end": 58.248958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      },
+      {
+        "start": 58.3125,
+        "end": 58.373958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      },
+      {
+        "start": 58.4375,
+        "end": 58.498958333333334,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "79": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 58.5,
+    "label_end": 59.4769,
+    "label_text": "trill 61 57 67 65",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 59.01,
+    "adjusted_end": 59.488958333333336,
+    "messages": [
+      "Label 58.500-59.477 trill 61 57 67 65",
+      "Filtered notes: 25, original count: 25",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 77/79 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 22,
+    "approx_end_measure": 22,
+    "expanded_start": 58.5,
+    "expanded_end": 59.498958333333334,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 25,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "76": 1,
+        "77": 4,
+        "79": 4,
+        "57": 4,
+        "61": 4,
+        "56": 4,
+        "62": 4
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 22,
+    "adjusted_end_measure": 22,
+    "accepted": true
+  },
+  {
+    "label_start": 59.0,
+    "label_end": 59.499,
+    "label_text": "trill 77 56 62 79",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 59.01,
+    "adjusted_end": 59.488958333333336,
+    "messages": [
+      "Label 59.000-59.499 trill 77 56 62 79",
+      "Filtered notes: 16, original count: 16",
+      "Unique pitches after filter: 4",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 77/79 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation",
+      "Discarded: duplicate verified region"
+    ],
+    "approx_start_measure": 22,
+    "approx_end_measure": 22,
+    "expanded_start": 59.0,
+    "expanded_end": 59.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 16,
+      "unique_pitches": 4,
+      "pitch_counts": {
+        "77": 4,
+        "79": 4,
+        "56": 4,
+        "62": 4
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": true,
+    "adjusted_start_measure": 22,
+    "adjusted_end_measure": 22,
+    "accepted": true
+  },
+  {
+    "label_start": 60.219,
+    "label_end": 60.749,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 60.26,
+    "adjusted_end": 60.738958333333336,
+    "messages": [
+      "Label 60.219-60.749 trill 71 72 73",
+      "Filtered notes: 18, original count: 19",
+      "Unique pitches after filter: 11",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 22,
+    "approx_end_measure": 22,
+    "expanded_start": 60.079,
+    "expanded_end": 60.889,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 18,
+      "unique_pitches": 11,
+      "pitch_counts": {
+        "71": 4,
+        "72": 4,
+        "69": 1,
+        "81": 1,
+        "79": 1,
+        "78": 1,
+        "76": 1,
+        "57": 1,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 22,
+    "adjusted_end_measure": 22,
+    "accepted": true
+  },
+  {
+    "label_start": 61.2202,
+    "label_end": 61.499,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 61.26,
+    "adjusted_end": 61.488958333333336,
+    "messages": [
+      "Label 61.220-61.499 trill 71 72 73",
+      "Filtered notes: 9, original count: 9",
+      "Unique pitches after filter: 6",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 23,
+    "approx_end_measure": 23,
+    "expanded_start": 61.0802,
+    "expanded_end": 61.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 9,
+      "unique_pitches": 6,
+      "pitch_counts": {
+        "71": 2,
+        "72": 2,
+        "57": 1,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 23,
+    "adjusted_end_measure": 23,
+    "accepted": true
+  },
+  {
+    "label_start": 62.8986,
+    "label_end": 63.499,
+    "label_text": "trill 76 78",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 62.92666666666666,
+    "adjusted_end": 63.488958333333336,
+    "messages": [
+      "Label 62.899-63.499 trill 76 78",
+      "Filtered notes: 14, original count: 14",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 76/78 occur 9 times and are close",
+      "Using 9 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 23,
+    "approx_end_measure": 23,
+    "expanded_start": 62.833333333333336,
+    "expanded_end": 63.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 14,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "79": 1,
+        "76": 5,
+        "78": 4,
+        "43": 1,
+        "55": 1,
+        "45": 1,
+        "57": 1
+      },
+      "pair": [
+        76,
+        78
+      ],
+      "pair_count": 9,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        76,
+        78
+      ]
+    },
+    "selected_pitches": [
+      76,
+      78
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 23,
+    "adjusted_end_measure": 23,
+    "accepted": true
+  },
+  {
+    "label_start": 64.3253,
+    "label_end": 64.6722,
+    "label_text": "trill 79",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 64.385,
+    "adjusted_end": 64.73895833333333,
+    "messages": [
+      "Label 64.325-64.672 trill 79",
+      "Filtered notes: 13, original count: 13",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.043s",
+      "Accepted: pitches 79/77 occur 6 times and are close",
+      "Using 6 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 24,
+    "approx_end_measure": 24,
+    "expanded_start": 64.1853,
+    "expanded_end": 64.74895833333333,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 13,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "79": 3,
+        "77": 3,
+        "76": 1,
+        "61": 1,
+        "64": 1,
+        "69": 2,
+        "62": 1,
+        "65": 1
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 6,
+      "max_gap": 0.04270833333333712,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 24,
+    "adjusted_end_measure": 24,
+    "accepted": true
+  },
+  {
+    "label_start": 65.3384,
+    "label_end": 65.7264,
+    "label_text": "trill 79 77",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 65.385,
+    "adjusted_end": 65.73895833333333,
+    "messages": [
+      "Label 65.338-65.726 trill 79 77",
+      "Filtered notes: 13, original count: 13",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.043s",
+      "Accepted: pitches 79/77 occur 6 times and are close",
+      "Using 6 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 24,
+    "approx_end_measure": 24,
+    "expanded_start": 65.19839999999999,
+    "expanded_end": 65.74895833333333,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 13,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "79": 3,
+        "77": 3,
+        "76": 1,
+        "61": 1,
+        "64": 1,
+        "69": 2,
+        "62": 1,
+        "65": 1
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 6,
+      "max_gap": 0.04270833333333712,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 24,
+    "adjusted_end_measure": 24,
+    "accepted": true
+  },
+  {
+    "label_start": 68.2366,
+    "label_end": 68.749,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 68.26,
+    "adjusted_end": 68.73895833333333,
+    "messages": [
+      "Label 68.237-68.749 trill 71 72 73",
+      "Filtered notes: 17, original count: 18",
+      "Unique pitches after filter: 10",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 25,
+    "approx_end_measure": 25,
+    "expanded_start": 68.0966,
+    "expanded_end": 68.889,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 17,
+      "unique_pitches": 10,
+      "pitch_counts": {
+        "71": 4,
+        "72": 4,
+        "69": 1,
+        "81": 1,
+        "79": 1,
+        "78": 1,
+        "76": 1,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 25,
+    "adjusted_end_measure": 25,
+    "accepted": true
+  },
+  {
+    "label_start": 69.235,
+    "label_end": 69.499,
+    "label_text": "trill 71 72 73",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 69.26,
+    "adjusted_end": 69.48895833333333,
+    "messages": [
+      "Label 69.235-69.499 trill 71 72 73",
+      "Filtered notes: 8, original count: 8",
+      "Unique pitches after filter: 5",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 71/72 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 26,
+    "approx_end_measure": 26,
+    "expanded_start": 69.095,
+    "expanded_end": 69.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 8,
+      "unique_pitches": 5,
+      "pitch_counts": {
+        "71": 2,
+        "72": 2,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        71,
+        72
+      ]
+    },
+    "selected_pitches": [
+      71,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 26,
+    "adjusted_end_measure": 26,
+    "accepted": true
+  },
+  {
+    "label_start": 70.8974,
+    "label_end": 71.499,
+    "label_text": "trill 76 78",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 70.92666666666668,
+    "adjusted_end": 71.48895833333333,
+    "messages": [
+      "Label 70.897-71.499 trill 76 78",
+      "Filtered notes: 14, original count: 14",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 76/78 occur 9 times and are close",
+      "Using 9 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 26,
+    "approx_end_measure": 26,
+    "expanded_start": 70.83333333333333,
+    "expanded_end": 71.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 14,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "79": 1,
+        "76": 5,
+        "78": 4,
+        "31": 1,
+        "43": 1,
+        "33": 1,
+        "45": 1
+      },
+      "pair": [
+        76,
+        78
+      ],
+      "pair_count": 9,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        76,
+        78
+      ]
+    },
+    "selected_pitches": [
+      76,
+      78
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 26,
+    "adjusted_end_measure": 26,
+    "accepted": true
+  },
+  {
+    "label_start": 77.4954,
+    "label_end": 78.374,
+    "label_text": "trill 77 79",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 77.51,
+    "adjusted_end": 78.36395833333333,
+    "messages": [
+      "Label 77.495-78.374 trill 77 79",
+      "Filtered notes: 31, original count: 31",
+      "Unique pitches after filter: 6",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 77/79 occur 18 times and are close",
+      "Using 18 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 29,
+    "approx_end_measure": 29,
+    "expanded_start": 77.41666666666667,
+    "expanded_end": 78.415625,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 31,
+      "unique_pitches": 6,
+      "pitch_counts": {
+        "77": 9,
+        "79": 9,
+        "76": 1,
+        "62": 4,
+        "56": 4,
+        "59": 4
+      },
+      "pair": [
+        77,
+        79
+      ],
+      "pair_count": 18,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        77,
+        79
+      ]
+    },
+    "selected_pitches": [
+      77,
+      79
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 29,
+    "adjusted_end_measure": 29,
+    "accepted": true
+  },
+  {
+    "label_start": 80.4683,
+    "label_end": 80.999,
+    "label_text": "trill 72 74",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 80.468-80.999 trill 72 74",
+      "Filtered notes: 15, original count: 15",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.066s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 30,
+    "approx_end_measure": 30,
+    "expanded_start": 80.41666666666667,
+    "expanded_end": 80.999,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 15,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "72": 4,
+        "74": 3,
+        "71": 1,
+        "64": 1,
+        "54": 2,
+        "57": 2,
+        "62": 2
+      },
+      "pair": [
+        72,
+        74
+      ],
+      "pair_count": 7,
+      "max_gap": 0.06562499999999716
+    },
+    "subregions": [
+      {
+        "start": 80.5,
+        "end": 80.871875,
+        "accepted": true,
+        "messages": [
+          "Filtered notes: 6, original count: 6",
+          "Unique pitches after filter: 2",
+          "Max gap between selected notes: 0.003s",
+          "Accepted: pitches 72/74 occur 6 times and are close"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": true,
+            "has_pitch_counts": true,
+            "case2_two_pitches": true,
+            "no_large_gap": true
+          },
+          "filtered_note_count": 6,
+          "unique_pitches": 2,
+          "pitch_counts": {
+            "72": 3,
+            "74": 3
+          },
+          "pair": [
+            72,
+            74
+          ],
+          "pair_count": 6,
+          "max_gap": 0.003124999999997158,
+          "selected_pitches": [
+            72,
+            74
+          ]
+        },
+        "pitch_counts": {
+          "72": 3,
+          "74": 3
+        },
+        "adjusted_start": 80.51,
+        "adjusted_end": 80.861875,
+        "duplicate": false
+      },
+      {
+        "start": 80.9375,
+        "end": 80.99895833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "72": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 81.4858,
+    "label_end": 82.005,
+    "label_text": "trill 72 71",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 81.486-82.005 trill 72 71",
+      "Filtered notes: 11, original count: 12",
+      "Unique pitches after filter: 7",
+      "Rejected: heuristics failed",
+      "Rejected: heuristics indicate region is not a trill"
+    ],
+    "approx_start_measure": 30,
+    "approx_end_measure": 30,
+    "expanded_start": 81.41666666666667,
+    "expanded_end": 82.08229166666666,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "case1_single_pitch": false
+      },
+      "filtered_note_count": 11,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "69": 1,
+        "71": 1,
+        "79": 1,
+        "62": 3,
+        "55": 2,
+        "59": 2,
+        "52": 1
+      },
+      "pair": [
+        62,
+        55
+      ],
+      "pair_count": 5,
+      "semitone_apart": false
+    }
+  },
+  {
+    "label_start": 82.4705,
+    "label_end": 83.0211,
+    "label_text": "trill 69 71",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 82.471-83.021 trill 69 71",
+      "Filtered notes: 17, original count: 17",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.066s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 31,
+    "approx_end_measure": 31,
+    "expanded_start": 82.41666666666667,
+    "expanded_end": 83.08229166666666,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 17,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "69": 4,
+        "71": 3,
+        "67": 1,
+        "78": 1,
+        "60": 3,
+        "54": 2,
+        "57": 2,
+        "51": 1
+      },
+      "pair": [
+        69,
+        71
+      ],
+      "pair_count": 7,
+      "max_gap": 0.06562499999999716
+    },
+    "subregions": [
+      {
+        "start": 82.5,
+        "end": 82.871875,
+        "accepted": true,
+        "messages": [
+          "Filtered notes: 6, original count: 6",
+          "Unique pitches after filter: 2",
+          "Max gap between selected notes: 0.003s",
+          "Accepted: pitches 69/71 occur 6 times and are close"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": true,
+            "has_pitch_counts": true,
+            "case2_two_pitches": true,
+            "no_large_gap": true
+          },
+          "filtered_note_count": 6,
+          "unique_pitches": 2,
+          "pitch_counts": {
+            "69": 3,
+            "71": 3
+          },
+          "pair": [
+            69,
+            71
+          ],
+          "pair_count": 6,
+          "max_gap": 0.003124999999997158,
+          "selected_pitches": [
+            69,
+            71
+          ]
+        },
+        "pitch_counts": {
+          "69": 3,
+          "71": 3
+        },
+        "adjusted_start": 82.51,
+        "adjusted_end": 82.861875,
+        "duplicate": false
+      },
+      {
+        "start": 82.9375,
+        "end": 82.99895833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "69": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 84.2321,
+    "label_end": 84.749,
+    "label_text": "trill 72 74",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 84.26,
+    "adjusted_end": 84.73895833333333,
+    "messages": [
+      "Label 84.232-84.749 trill 72 74",
+      "Filtered notes: 17, original count: 18",
+      "Unique pitches after filter: 10",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 72/74 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 31,
+    "approx_end_measure": 31,
+    "expanded_start": 84.0921,
+    "expanded_end": 84.889,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 17,
+      "unique_pitches": 10,
+      "pitch_counts": {
+        "72": 4,
+        "74": 4,
+        "71": 1,
+        "83": 1,
+        "81": 1,
+        "79": 1,
+        "78": 1,
+        "64": 2,
+        "57": 1,
+        "60": 1
+      },
+      "pair": [
+        72,
+        74
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        72,
+        74
+      ]
+    },
+    "selected_pitches": [
+      72,
+      74
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 31,
+    "adjusted_end_measure": 31,
+    "accepted": true
+  },
+  {
+    "label_start": 85.2287,
+    "label_end": 85.499,
+    "label_text": "trill 72 74",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 85.26,
+    "adjusted_end": 85.48895833333333,
+    "messages": [
+      "Label 85.229-85.499 trill 72 74",
+      "Filtered notes: 8, original count: 8",
+      "Unique pitches after filter: 5",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 72/74 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 32,
+    "approx_end_measure": 32,
+    "expanded_start": 85.0887,
+    "expanded_end": 85.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 8,
+      "unique_pitches": 5,
+      "pitch_counts": {
+        "72": 2,
+        "74": 2,
+        "64": 2,
+        "57": 1,
+        "60": 1
+      },
+      "pair": [
+        72,
+        74
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        72,
+        74
+      ]
+    },
+    "selected_pitches": [
+      72,
+      74
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 32,
+    "adjusted_end_measure": 32,
+    "accepted": true
+  },
+  {
+    "label_start": 86.875,
+    "label_end": 91.398,
+    "label_text": "trill 78 79 64 67",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 86.875-91.398 trill 78 79 64 67",
+      "Filtered notes: 89, original count: 96",
+      "Unique pitches after filter: 12",
+      "Rejected: heuristics failed",
+      "Rejected: heuristics indicate region is not a trill"
+    ],
+    "approx_start_measure": 32,
+    "approx_end_measure": 34,
+    "expanded_start": 86.875,
+    "expanded_end": 91.49895833333333,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "case1_single_pitch": false
+      },
+      "filtered_note_count": 89,
+      "unique_pitches": 12,
+      "pitch_counts": {
+        "78": 5,
+        "76": 4,
+        "79": 6,
+        "77": 3,
+        "74": 3,
+        "72": 1,
+        "45": 1,
+        "57": 1,
+        "47": 1,
+        "59": 1,
+        "64": 32,
+        "67": 31
+      },
+      "pair": [
+        64,
+        67
+      ],
+      "pair_count": 63,
+      "semitone_apart": false
+    }
+  },
+  {
+    "label_start": 87.5,
+    "label_end": 95.8359,
+    "label_text": "trill 67 72 66 62 74 71",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 87.51,
+    "adjusted_end": 95.48895833333333,
+    "messages": [
+      "Label 87.500-95.836 trill 67 72 66 62 74 71",
+      "Filtered notes: 191, original count: 202",
+      "Unique pitches after filter: 13",
+      "Max gap between 62/64: 0.001s",
+      "Accepted: pitches 62/64 occur 64 times and are close",
+      "Using 65 notes from selected pitches for boundary calculation",
+      "Filtered out 1 long notes (> 140ms)"
+    ],
+    "approx_start_measure": 32,
+    "approx_end_measure": 36,
+    "expanded_start": 87.5,
+    "expanded_end": 95.9759,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "alt_pair": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 191,
+      "unique_pitches": 13,
+      "pitch_counts": {
+        "77": 3,
+        "76": 5,
+        "74": 11,
+        "79": 5,
+        "72": 20,
+        "71": 14,
+        "81": 2,
+        "69": 2,
+        "78": 2,
+        "64": 32,
+        "67": 47,
+        "62": 32,
+        "66": 16
+      },
+      "pair": [
+        62,
+        64
+      ],
+      "pair_count": 64,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        62,
+        64
+      ]
+    },
+    "selected_pitches": [
+      62,
+      64
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 32,
+    "adjusted_end_measure": 35,
+    "accepted": true
+  },
+  {
+    "label_start": 91.5,
+    "label_end": 95.999,
+    "label_text": "trill 72 62 66 71 67",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 91.500-95.999 trill 72 62 66 71 67",
+      "Filtered notes: 116, original count: 120",
+      "Unique pitches after filter: 11",
+      "Rejected: heuristics failed",
+      "Rejected: heuristics indicate region is not a trill"
+    ],
+    "approx_start_measure": 34,
+    "approx_end_measure": 36,
+    "expanded_start": 91.5,
+    "expanded_end": 95.999,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "case1_single_pitch": false
+      },
+      "filtered_note_count": 116,
+      "unique_pitches": 11,
+      "pitch_counts": {
+        "72": 19,
+        "74": 8,
+        "71": 14,
+        "81": 2,
+        "69": 2,
+        "79": 3,
+        "78": 2,
+        "76": 2,
+        "62": 32,
+        "66": 16,
+        "67": 16
+      },
+      "pair": [
+        62,
+        72
+      ],
+      "pair_count": 51,
+      "semitone_apart": false
+    }
+  },
+  {
+    "label_start": 98.6169,
+    "label_end": 99.499,
+    "label_text": "trill 81",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 98.617-99.499 trill 81",
+      "Filtered notes: 4, original count: 13",
+      "Unique pitches after filter: 2",
+      "Max gap between selected notes: 0.064s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 37,
+    "approx_end_measure": 37,
+    "expanded_start": 98.5,
+    "expanded_end": 99.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 4,
+      "unique_pitches": 2,
+      "pitch_counts": {
+        "80": 1,
+        "81": 3
+      },
+      "pair": [
+        80,
+        81
+      ],
+      "pair_count": 4,
+      "max_gap": 0.06354166666666572
+    },
+    "subregions": [
+      {
+        "start": 98.5,
+        "end": 98.81145833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 3, original count: 3",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 3
+        },
+        "pitch_counts": {
+          "80": 1,
+          "81": 2
+        }
+      },
+      {
+        "start": 98.875,
+        "end": 98.93645833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "81": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 105.125,
+    "label_end": 105.686,
+    "label_text": "trill 71",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 105.125-105.686 trill 71",
+      "Filtered notes: 8, original count: 13",
+      "Unique pitches after filter: 3",
+      "Max gap between selected notes: 0.064s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 39,
+    "approx_end_measure": 39,
+    "expanded_start": 105.125,
+    "expanded_end": 105.82600000000001,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 8,
+      "unique_pitches": 3,
+      "pitch_counts": {
+        "71": 5,
+        "72": 2,
+        "69": 1
+      },
+      "pair": [
+        71,
+        72
+      ],
+      "pair_count": 7,
+      "max_gap": 0.06354166666666572
+    },
+    "subregions": [
+      {
+        "start": 105.125,
+        "end": 105.18645833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "71": 1
+        }
+      },
+      {
+        "start": 105.25,
+        "end": 105.31145833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "71": 1
+        }
+      },
+      {
+        "start": 105.375,
+        "end": 105.43645833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "71": 1
+        }
+      },
+      {
+        "start": 105.5,
+        "end": 105.74895833333333,
+        "accepted": true,
+        "messages": [
+          "Filtered notes: 4, original count: 4",
+          "Unique pitches after filter: 2",
+          "Max gap between selected notes: 0.001s",
+          "Accepted: pitches 71/72 occur 4 times and are close"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": true,
+            "has_pitch_counts": true,
+            "case2_two_pitches": true,
+            "no_large_gap": true
+          },
+          "filtered_note_count": 4,
+          "unique_pitches": 2,
+          "pitch_counts": {
+            "71": 2,
+            "72": 2
+          },
+          "pair": [
+            71,
+            72
+          ],
+          "pair_count": 4,
+          "max_gap": 0.0010416666666657193,
+          "selected_pitches": [
+            71,
+            72
+          ]
+        },
+        "pitch_counts": {
+          "71": 2,
+          "72": 2
+        },
+        "adjusted_start": 105.51,
+        "adjusted_end": 105.73895833333333,
+        "duplicate": false
+      }
+    ]
+  },
+  {
+    "label_start": 113.981,
+    "label_end": 116.499,
+    "label_text": "trill 74 50 54 76 73 55 72 57 71 70 49",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 113.981-116.499 trill 74 50 54 76 73 55 72 57 71 70 49",
+      "Filtered notes: 80, original count: 80",
+      "Unique pitches after filter: 11",
+      "Max gap between 72/74: 0.126s",
+      "Rejected: significant gap in trill region",
+      "Attempting subregion detection due to gaps"
+    ],
+    "approx_start_measure": 42,
+    "approx_end_measure": 43,
+    "expanded_start": 113.841,
+    "expanded_end": 116.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "alt_pair": false,
+        "no_large_gap": false
+      },
+      "filtered_note_count": 80,
+      "unique_pitches": 11,
+      "pitch_counts": {
+        "74": 12,
+        "76": 4,
+        "73": 4,
+        "72": 12,
+        "71": 4,
+        "70": 4,
+        "50": 16,
+        "54": 4,
+        "55": 12,
+        "57": 4,
+        "49": 4
+      },
+      "pair": [
+        50,
+        72
+      ],
+      "pair_count": 28,
+      "max_gap": null
+    },
+    "subregions": [
+      {
+        "start": 114.0,
+        "end": 115.99895833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 24, original count: 24",
+          "Unique pitches after filter: 2",
+          "Rejected: heuristics failed"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": true,
+            "has_pitch_counts": true,
+            "case2_two_pitches": false,
+            "case1_single_pitch": false
+          },
+          "filtered_note_count": 24,
+          "unique_pitches": 2,
+          "pitch_counts": {
+            "50": 16,
+            "72": 8
+          },
+          "pair": [
+            50,
+            72
+          ],
+          "pair_count": 24,
+          "semitone_apart": false
+        },
+        "pitch_counts": {
+          "50": 16,
+          "72": 8
+        }
+      },
+      {
+        "start": 116.0625,
+        "end": 116.12395833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "72": 1
+        }
+      },
+      {
+        "start": 116.1875,
+        "end": 116.24895833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "72": 1
+        }
+      },
+      {
+        "start": 116.3125,
+        "end": 116.37395833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "72": 1
+        }
+      },
+      {
+        "start": 116.4375,
+        "end": 116.49895833333333,
+        "accepted": false,
+        "messages": [
+          "Filtered notes: 1, original count: 1",
+          "Rejected: less than 4 short notes"
+        ],
+        "details": {
+          "checks": {
+            "has_notes": true,
+            "enough_short_notes": false
+          },
+          "filtered_note_count": 1
+        },
+        "pitch_counts": {
+          "72": 1
+        }
+      }
+    ]
+  },
+  {
+    "label_start": 116.5,
+    "label_end": 116.999,
+    "label_text": "trill 61 54",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": false
+    },
+    "adjusted_start": null,
+    "adjusted_end": null,
+    "messages": [
+      "Label 116.500-116.999 trill 61 54",
+      "Filtered notes: 10, original count: 10",
+      "Unique pitches after filter: 4",
+      "Rejected: heuristics failed",
+      "Rejected: heuristics indicate region is not a trill"
+    ],
+    "approx_start_measure": 43,
+    "approx_end_measure": 44,
+    "expanded_start": 116.5,
+    "expanded_end": 116.999,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": false,
+        "case1_single_pitch": false
+      },
+      "filtered_note_count": 10,
+      "unique_pitches": 4,
+      "pitch_counts": {
+        "69": 1,
+        "74": 1,
+        "57": 4,
+        "61": 4
+      },
+      "pair": [
+        57,
+        61
+      ],
+      "pair_count": 8,
+      "semitone_apart": false
+    }
+  },
+  {
+    "label_start": 116.999,
+    "label_end": 117.499,
+    "label_text": "trill 70 56 62 72 49",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 117.01,
+    "adjusted_end": 117.48895833333333,
+    "messages": [
+      "Label 116.999-117.499 trill 70 56 62 72 49",
+      "Filtered notes: 16, original count: 16",
+      "Unique pitches after filter: 4",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 70/72 occur 8 times and are close",
+      "Using 8 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 44,
+    "approx_end_measure": 44,
+    "expanded_start": 116.999,
+    "expanded_end": 117.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 16,
+      "unique_pitches": 4,
+      "pitch_counts": {
+        "70": 4,
+        "72": 4,
+        "56": 4,
+        "62": 4
+      },
+      "pair": [
+        70,
+        72
+      ],
+      "pair_count": 8,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        70,
+        72
+      ]
+    },
+    "selected_pitches": [
+      70,
+      72
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 44,
+    "adjusted_end_measure": 44,
+    "accepted": true
+  },
+  {
+    "label_start": 119.231,
+    "label_end": 119.498,
+    "label_text": "trill 64 66",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 119.26,
+    "adjusted_end": 119.48895833333333,
+    "messages": [
+      "Label 119.231-119.498 trill 64 66",
+      "Filtered notes: 8, original count: 8",
+      "Unique pitches after filter: 5",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 64/66 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 44,
+    "approx_end_measure": 44,
+    "expanded_start": 119.16666666666667,
+    "expanded_end": 119.49895833333333,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 8,
+      "unique_pitches": 5,
+      "pitch_counts": {
+        "64": 2,
+        "66": 2,
+        "62": 2,
+        "55": 1,
+        "59": 1
+      },
+      "pair": [
+        64,
+        66
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        64,
+        66
+      ]
+    },
+    "selected_pitches": [
+      64,
+      66
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 44,
+    "adjusted_end_measure": 44,
+    "accepted": true
+  },
+  {
+    "label_start": 120.902,
+    "label_end": 121.499,
+    "label_text": "trill 69 71",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 120.92666666666668,
+    "adjusted_end": 121.48895833333333,
+    "messages": [
+      "Label 120.902-121.499 trill 69 71",
+      "Filtered notes: 14, original count: 14",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 69/71 occur 9 times and are close",
+      "Using 9 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 45,
+    "approx_end_measure": 45,
+    "expanded_start": 120.83333333333333,
+    "expanded_end": 121.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 14,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "72": 1,
+        "69": 5,
+        "71": 4,
+        "36": 1,
+        "48": 1,
+        "38": 1,
+        "50": 1
+      },
+      "pair": [
+        69,
+        71
+      ],
+      "pair_count": 9,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        69,
+        71
+      ]
+    },
+    "selected_pitches": [
+      69,
+      71
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 45,
+    "adjusted_end_measure": 45,
+    "accepted": true
+  },
+  {
+    "label_start": 122.351,
+    "label_end": 122.742,
+    "label_text": "trill 84 82",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 122.385,
+    "adjusted_end": 122.73895833333333,
+    "messages": [
+      "Label 122.351-122.742 trill 84 82",
+      "Filtered notes: 13, original count: 13",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.043s",
+      "Accepted: pitches 84/82 occur 6 times and are close",
+      "Using 6 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 46,
+    "approx_end_measure": 46,
+    "expanded_start": 122.211,
+    "expanded_end": 122.74895833333333,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 13,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "84": 3,
+        "82": 3,
+        "81": 1,
+        "54": 1,
+        "57": 1,
+        "62": 2,
+        "55": 1,
+        "58": 1
+      },
+      "pair": [
+        82,
+        84
+      ],
+      "pair_count": 6,
+      "max_gap": 0.04270833333333712,
+      "selected_pitches": [
+        82,
+        84
+      ]
+    },
+    "selected_pitches": [
+      82,
+      84
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 46,
+    "adjusted_end_measure": 46,
+    "accepted": true
+  },
+  {
+    "label_start": 123.349,
+    "label_end": 123.728,
+    "label_text": "trill 84 82",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 123.385,
+    "adjusted_end": 123.73895833333333,
+    "messages": [
+      "Label 123.349-123.728 trill 84 82",
+      "Filtered notes: 13, original count: 13",
+      "Unique pitches after filter: 8",
+      "Max gap between selected notes: 0.043s",
+      "Accepted: pitches 84/82 occur 6 times and are close",
+      "Using 6 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 46,
+    "approx_end_measure": 46,
+    "expanded_start": 123.209,
+    "expanded_end": 123.74895833333333,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 13,
+      "unique_pitches": 8,
+      "pitch_counts": {
+        "84": 3,
+        "82": 3,
+        "81": 1,
+        "54": 1,
+        "57": 1,
+        "62": 2,
+        "55": 1,
+        "58": 1
+      },
+      "pair": [
+        82,
+        84
+      ],
+      "pair_count": 6,
+      "max_gap": 0.04270833333333712,
+      "selected_pitches": [
+        82,
+        84
+      ]
+    },
+    "selected_pitches": [
+      82,
+      84
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 46,
+    "adjusted_end_measure": 46,
+    "accepted": true
+  },
+  {
+    "label_start": 127.238,
+    "label_end": 127.499,
+    "label_text": "trill 64 66",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 127.26,
+    "adjusted_end": 127.48895833333333,
+    "messages": [
+      "Label 127.238-127.499 trill 64 66",
+      "Filtered notes: 8, original count: 8",
+      "Unique pitches after filter: 5",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 64/66 occur 4 times and are close",
+      "Using 4 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 47,
+    "approx_end_measure": 48,
+    "expanded_start": 127.098,
+    "expanded_end": 127.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 8,
+      "unique_pitches": 5,
+      "pitch_counts": {
+        "64": 2,
+        "66": 2,
+        "55": 2,
+        "48": 1,
+        "52": 1
+      },
+      "pair": [
+        64,
+        66
+      ],
+      "pair_count": 4,
+      "max_gap": 0.0010416666666657193,
+      "selected_pitches": [
+        64,
+        66
+      ]
+    },
+    "selected_pitches": [
+      64,
+      66
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 47,
+    "adjusted_end_measure": 48,
+    "accepted": true
+  },
+  {
+    "label_start": 128.907,
+    "label_end": 129.499,
+    "label_text": "trill 69 71",
+    "checks": {
+      "text_valid": true,
+      "trill_heuristics": true
+    },
+    "adjusted_start": 128.92666666666665,
+    "adjusted_end": 129.48895833333333,
+    "messages": [
+      "Label 128.907-129.499 trill 69 71",
+      "Filtered notes: 14, original count: 14",
+      "Unique pitches after filter: 7",
+      "Max gap between selected notes: 0.001s",
+      "Accepted: pitches 69/71 occur 9 times and are close",
+      "Using 9 notes from selected pitches for boundary calculation"
+    ],
+    "approx_start_measure": 48,
+    "approx_end_measure": 48,
+    "expanded_start": 128.83333333333334,
+    "expanded_end": 129.499,
+    "trill_details": {
+      "checks": {
+        "has_notes": true,
+        "enough_short_notes": true,
+        "has_pitch_counts": true,
+        "case2_two_pitches": true,
+        "no_large_gap": true
+      },
+      "filtered_note_count": 14,
+      "unique_pitches": 7,
+      "pitch_counts": {
+        "72": 1,
+        "69": 5,
+        "71": 4,
+        "36": 1,
+        "48": 1,
+        "38": 1,
+        "50": 1
+      },
+      "pair": [
+        69,
+        71
+      ],
+      "pair_count": 9,
+      "max_gap": 0.0010416666666799301,
+      "selected_pitches": [
+        69,
+        71
+      ]
+    },
+    "selected_pitches": [
+      69,
+      71
+    ],
+    "duplicate": false,
+    "adjusted_start_measure": 48,
+    "adjusted_end_measure": 48,
+    "accepted": true
+  }
+]

@@ -1,0 +1,239 @@
+# trillfinder.srp -- look for trills and make labels
+#
+# Roger B. Dannenberg
+# May 2025
+
+# Algorithm: For each note in the score, search forward for repeated
+# notes at a maximum separation.
+#
+# Rather than looking for alternating pitches close together, we only
+# find repeated notes because in some MIDI files there is some time
+# quantization and trills do not appear as cleanly alternating note
+# sequences as you would expect in a performance.
+#
+# As we find each new repeating sequences, we either add it to the
+# list if it is not overlapping in time, or merge the overlapping time
+# spans.
+#
+# In tests, there was at least one example where a trill had 4
+# repetitions of one pitch, but the other was played only 3 times, so
+# it was not detected.  This complicates the algorithm: instead of one
+# master list of intervals where trill-like repetitions are found, we
+# build a list for each performance. Then, within this list, we
+# re-examine each trill. If there is only one pitch, we should look
+# in the score over a time period that starts 125 msec before and ends
+# 125 msec after. Search for pitches at +1, +2, -1 and -2. If you find
+# at least 2 pitches within 250 msec, consider that note sequence to be 
+# a candidate to be part of the trill. A problem is that you might find
+# more than one candidate. Therefore, first collect all candidates,
+# favoring 3-note over 2-note candidates. If you still have more than
+# one candidate, print a warning message. Finally, adjust the time
+# interval and add the pitch(es) of the candidate(s) to the trill data.
+#
+# Finally, we could end up with one-note "trills" -- keep these so that
+# they can be manually examined.  And we could have "trills" with
+# intervals larger than a major 2nd. For each pitch in each trill
+# structure (an Aud_label), test if the pitch is a whole tone or less
+# from the nearest other pitch. If not, move the pitch to a separate
+# label so that it will be noticed when labels are manually examined.
+
+MIN_TRILL_REPEATS = 4
+MIN_TRILL_REPEATS_NEAR = 2  // allow only 2 notes if they are near a trill label
+MAX_TRILL_PERIOD = 0.25  // seconds
+TRILL_NEIGHBORS = [-2, -1, 1, 2]
+
+
+def trill_list_print(trills, optional msg):
+    var prefix = ""
+    if msg:
+        print msg
+        prefix = "    "
+    for trill in trills:
+        print prefix; trill
+
+
+def trill_test(notes, i):
+# look for repeated notes starting at i.
+    var start = notes[i].time
+    var last_i = i
+    var last_time = start
+    var p = notes[i].key
+    var count = 1
+    i = i + 1
+    while i < len(notes) and notes[i].time < last_time + MAX_TRILL_PERIOD:
+        if notes[i].key == p:
+            last_i = i
+            last_time = notes[i].time
+            count = count + 1
+        i = i + 1
+    if count >= MIN_TRILL_REPEATS:
+        return Aud_label(start, notes[last_i].get_end_time(), 'trill', [p])
+    return nil
+
+
+
+def trill_merge(trills, new):
+# merge a candidate element with any overlap in trills
+    for trill in trills:
+        if trill.overlap(new):  // merge overlapping trill
+            trill.start = min(trill.start, new.start)
+            trill.stop = max(trill.stop, new.stop)
+            for p in new.data:
+                if p not in trill.data:
+                    trill.data.append(p)
+            return
+    trills.append(new)  // add new non-overlapping trill
+
+
+
+def trill_seek_time(notes, time):
+# find index of first note event after time
+    for i = 0 to len(notes):
+        if notes[i].time > time:
+            return i
+    return i
+
+
+
+def trill_find_repeated_notes(notes, i, p, stop):
+# starting at i and searching until stop, look for repeated pitches
+# matching p. Returns list of notes found
+    var repeated_notes = []
+    // find first occurrence of p
+    while i < len(notes) and notes[i].time < stop and notes[i].key != p:
+        i = i + 1
+
+    if i < len(notes) and notes[i].time < stop:  // notes[i].key must equal p
+        notes.append(notes[i])
+        var last_time = notes[i].time
+        i = i + 1
+    else:
+        return nil  // no repeating notes found
+
+    // find repeats of p
+    while i < len(notes) and notes[i].time < last_time + MAX_TRILL_PERIOD:
+        if notes[i].key == p:
+            last_time = notes[i].time
+            repeated_notes.append(notes[i])
+        i = i + 1
+    if len(repeated_notes) >= MIN_TRILL_REPEATS_NEAR:
+        return repeated_notes
+    return nil
+
+
+
+def trill_finder(notes):
+    var trills = []
+    for note at i in notes:
+        var trill = trill_test(notes, i)
+        if trill:
+            trill_merge(trills, trill)
+
+    // search for nearby sequences of 2 or 3 notes:
+    for trill in trills:
+        i = trill_seek_time(notes, trill.start - MAX_TRILL_PERIOD / 2)
+        // for each pitch in trill (hopefully just one), search for neighbors
+        for p in trill.data:
+            // for each offset, look for a candidate sequence
+            var best = []  // accumulates candidate sequences of same length
+            for offset in TRILL_NEIGHBORS:
+                // when searching for nearby pitches, rule out those already in
+                // trill.data:
+                if (p + offset) not in trill.data:
+                    var candidate = trill_find_repeated_notes(notes, i,
+                            p + offset, trill.stop + MAX_TRILL_PERIOD / 2)
+                    if candidate:
+                        if len(best) == 0 or len(candidate) > len(best[0]):
+                            best.clear()
+                            best.append(candidate)
+                        elif len(best) > 0 and len(candidate) == len(best[0]):
+                            best.append(candidate)
+            if len(best) > 1:
+                print "WARNING: found", len(best), "different sequences of",
+                print     len(best[0]), "repeated pitches near", p,
+                print     "near time", best[0][0].time, "(adding all to trill)"
+        for b in best:
+            trill_merge(trills, Aud_label(b[0].time, b.last().get_end_time(),
+                                          'trill', [b[0].key]))
+
+    // clean up trills with isolated notes
+    // print "trill_finder BEFORE OUTLIER CLEANUP"
+    // print_labels(trills)
+    outliers = []
+    for trill in trills:
+        outliers.clear()
+        var is_outlier = true
+        for p in trill.data:
+            for p2 in trill.data:
+                var diff = abs(p - p2)
+                if diff > 0 and diff <= 2:
+                    is_outlier = false
+            // p has no near neighbors in trill.data and there are other
+            // pitches in trill.data, move p to outliers
+            if is_outlier and len(trill.data) > 1:
+                trill.data.remove(p)
+                outliers.append(
+                    Aud_label(trill.start, trill.stop, 'trill', [p]))
+    for outlier in outliers:
+        trills.append(outlier)
+    // print "trill_finder AFTER OUTLIER CLEANUP"
+    // print_labels(trills)
+    return trills
+
+
+
+def trill_write_labels(filename, trills):
+    var outf = open(filename, "w")
+    if not outf:
+        print "ERROR: trill_write_labels could not open", filename,
+        print     "for writing."
+    for trill in trills:
+        outf.write(str(trill.start) + "\t" + str(trill.stop) + "\ttrill")
+        for pitch in trill.pitch:
+            outf.write(" " + str(pitch))
+        outf.write("\n")
+    outf.close()
+
+
+
+def update_score_trills(score_hints, perf_hints, spwl, ppwl):
+# merge data from perf_hints into score_hints. spwl and ppwl are
+# mappings from midi time to beats so we can map from performance
+# time to score time.
+    for perf_hint in perf_hints:
+        assert(len(perf_hint.data) > 0)
+        // adjust times to be score times: perf time -> beat -> score time
+        perf_hint.start = spwl.inverse(ppwl.lookup(perf_hint.start))
+        perf_hint.stop = spwl.inverse(ppwl.lookup(perf_hint.stop))
+
+        trill_merge(score_hints, perf_hint)
+
+//        if len(perf_hint.data) > 1:  // we can merge actual trills
+//            print "update_score_trills merging", perf_hint
+//            trill_merge(score_hints, perf_hint)
+//        else:  // single-pitch trills are kept single to make them
+//               // stand out in manual inspection
+//            print "update_score_trills appending", perf_hint
+//            assert(len(perf_hint.data) > 0)
+//            score_hints.append(perf_hint)
+
+
+
+def estimate_labels(hints, spwl, midi_perf, optional metadata, row_num):
+# use heuristics (trillfinder) to find trills and build a labels file
+# by combining labels estimated for midi_score and (if metadata and
+# row_num are provided) all the performances of midi_score.
+# parameters:
+#    hints - existing hints to which new ones are added
+#    spwl - mapping from score time to beats
+#    midi_score - path to midi score file
+#    metadata - rows from metadata.csv, contains score and performance paths
+#    row_num - the first row number in a group of rows with a given score
+# if metadata and row_num are nil, run trill_finder on just the midi_score
+    // analyze each performances:
+    var plabels = get_labels(midi_perf)
+    var pseq = allegro_smf_read(midi_perf)
+    var ptrack = extract_track("  Performance MIDI", pseq)
+    var ppwl = labels_to_pwl(plabels)
+    var perf_follower_hints = trill_finder(ptrack)
+    update_score_trills(hints, perf_follower_hints, spwl, ppwl)

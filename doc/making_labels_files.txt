@@ -1,0 +1,115 @@
+making_labels_files.txt -- how to put trill and grace note labels into
+   a file.
+
+
+It's pretty clear now that trills are the major problem with
+accompaniment. (Probably made worse by non-zero penalty for extra
+notes, because trills inject lots of extra notes if they are not
+expected.) Trills cannot be reliably detected in the score (and in at
+least one case, the performer played an unmarked trill!) Therefore,
+the midi_score.mid file is augmented with a midi_score_labels.txt file
+with annotations. (See doc/score_following.txt for details.)
+
+
+The annotations are Audacity labels. Here's the process for creating a
+labels file for a score.
+
+A. Run serpent64 run_bench.srp <n> <m> --list, where <n> and <m> are
+ID numbers (row numbers) for the metadata. This will print info about
+rows <n> through <m>.  You are looking for all rows that contain
+performances for the score (and no others).
+
+B. Now that you know <n> and <m>, run 
+    serpent64 run_bench.srp <n> <m> --trill  
+which will compute trill_finder_labels.txt and put it in a
+subdirectory under scorefollowing/sfhints/. This is a "best guess" as
+to where trills are. It computes this by looking for trill-like
+sequences of notes in every performance as well as the score. When
+trills are found in performances, they are mapped using ASAP
+annotation files from performance time into score time since they are
+not aligned (except through annotation files). After translation into
+score time, trills are merged since we expect the same trills to be
+detected in multiple performances.
+
+The program also detects when scores seem to be symbolic with
+perfectly aligned chords. If so, it adds a label that reduces
+"epsilon". Epsilon is the maximum time difference between two notes
+for them to be considered in the same chord. In very first Bach fugue
+in ASAP, the score tempo is so high that the sixteenth note is shorter
+(72 msec) than the default epsilon (75 msec) and many notes get
+grouped into chords, which is not so bad for matching, but results in
+matches being reported at the wrong time.  (So probably, when you see
+an epsilon=50 label, it is a good label to keep.)
+
+C. Estimated trill timing is far from perfect, so this step manually
+corrects the labels. Import the midi_score.mid into Audacity. Also
+import the generated trill_finder_labels.txt. Create another label
+track to contain the corrected labels (or you can load another copy of
+trill_finder_labels.txt).  For each trill label, try to find the
+corresponding trill in the score.
+
+  i.   You should adjust the beginning of the label to just after
+       (within 50 msec of) the note that appears in the score. That
+       way, a chord will be created for the note and the trill will be
+       associated with the chord.
+
+  ii.  Check the notes in the trill label. They should match the actual
+       notes in the trill.  Some generated trill labels may have a
+       single pitch, indicating that a trill-like repetition was
+       found, but there were no repeating near-neighbors to form a
+       conventional trill. You should investigate, but if the
+       repeating notes are to be played as they appear in the score
+       file, remove the label.
+
+  iii. Adjust the ending of the trill to end when the trill ends in
+       the score (unless you think the trill could be played longer.
+       In general, there is no penalty for playing a trill too short,
+       but there is a penalty for playing too long. For example, if
+       the trill note is followed by a rest and you think the
+       performer might trill through the rest, you should make the
+       label extend through the rest so the score follower does not
+       reject the extended trill as a bunch of extra notes.)
+
+  iv.  There may be grace notes or other ornamentation. (For example,
+       in one score, there is a mordent, which the performer plays as
+       something like A G F# G A G A G A G ..., similar to a trill on
+       G, but note the F# *below* the G. Grace notes can be handled
+       with a "grace" label that includes the pitches to be matched
+       *once*. E.g. if this were labeled as "grace F#4" then the
+       matcher will give a small credit if the F# is played, and not
+       penalty if it is omitted. The "grace" label goes *before* the
+       grace note and *before* the score note or chord you want the
+       grace notes to be associated with. Conventional grace notes
+       that appear before the "main" note are handled in the same way.
+       Check the .musicxml score for grace notes since these will not
+       show up automatically in the labels file. (Note that if grace
+       notes are in the midi_score.mid file, they will be expected
+       in the performance like any other note. If the
+       performer might *omit* a grace note, it is better to label it
+       as such, since there is a penalty for not playing a regular
+       note, but no penalty for not playing a grace note. Also, grace
+       notes do not generate score position reports since they are
+       likely to occur "early" before the note they are connected to
+       in the score.
+       
+
+
+D. After adjusting all the trill labels (and possibly adding or
+deleting some), export the label track to
+   scorefollowing/sfhints/.../midi_score_labels.txt
+Note that this is not in the ASAP dataset but in our repo so we can
+share these. Only the first two (for bwv_846 and bwv_848) exist as of
+May 25, 2025.)
+
+E. Now, you can run 
+    serpent64 run_bench.srp <id>
+where <id> is in the range <n> to <m> (or just run with <n> <m> to
+evaluate them all. You can see if the score following improves. It is
+not implemented as of May 25, 2025, but the --nohints flag should run
+the evaluation without the label file for comparison.
+
+
+
+
+
+
