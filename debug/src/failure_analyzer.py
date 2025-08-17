@@ -829,55 +829,58 @@ class FailureAnalyzer:
                 excess_seconds = score_row_gap - timing_limit
                 excess_ms = excess_seconds * 1000
                 
-                # Analyze score row timing context
-                score_context = self._analyze_score_row_timing_context(check)
+                # Analyze timing context and detect algorithm bugs
+                score_context = self._analyze_algorithm_bug_context(check)
                 
                 failure_detail = {
-                    'score_row_gap': score_row_gap,
+                    'ioi_value': score_row_gap,  # Keep original field for compatibility
                     'timing_limit': timing_limit,
                     'excess_seconds': excess_seconds,
                     'excess_ms': excess_ms,
                     'constraint_type': constraint_type,
                     'time': check['curr_time'],
                     'prev_time': check.get('prev_time', -1),
-                    'score_timing_context': score_context
+                    'algorithm_context': score_context  # Updated field name
                 }
                 failures.append(failure_detail)
         return failures
     
-    def _analyze_score_row_timing_context(self, timing_check: Dict) -> Dict[str, Any]:
-        """Analyze score row timing constraint context."""
+    def _analyze_algorithm_bug_context(self, timing_check: Dict) -> Dict[str, Any]:
+        """Analyze timing constraint context and detect algorithm bugs."""
         try:
             curr_time = timing_check.get('curr_time', 0)
             prev_time = timing_check.get('prev_time', 0)
             constraint_type = timing_check.get('constraint_type', 'unknown')
-            score_row_gap = timing_check.get('ioi', 0)  # Time since this score row last matched
+            ioi_value = timing_check.get('ioi', 0)  
             
-            # This is NOT performance IOI - it's the gap since this score row last matched a note
-            is_uninitialized = prev_time < 0
+            # Detect the Cell initialization bug
+            is_initialization_bug = (prev_time == -1.0 and ioi_value > 10.0)
             
-            if is_uninitialized:
+            if is_initialization_bug:
                 return {
-                    'timing_type': 'score_row_constraint',
-                    'last_match_time': 'uninitialized (-1)',
-                    'current_note_time': f"{curr_time:.3f}s",
-                    'score_row_gap': f"{score_row_gap:.3f}s",
+                    'timing_type': 'algorithm_bug',
+                    'bug_type': 'cell_initialization_bug',
+                    'prev_time': prev_time,
+                    'current_time': f"{curr_time:.3f}s",
+                    'calculated_ioi': f"{ioi_value:.3f}s",
+                    'calculation': f"{curr_time:.3f} - ({prev_time}) = {ioi_value:.3f}s",
                     'constraint_limit': self._estimate_score_ioi(constraint_type),
-                    'interpretation': 'No previous match to this score row - checking if current note can start new chord',
-                    'constraint_type': constraint_type
+                    'interpretation': 'ALGORITHM BUG: Cell.time initialized to -1, causing invalid IOI calculation',
+                    'constraint_type': constraint_type,
+                    'bug_description': 'The algorithm uses Cell objects with time=-1 for out-of-window cells, creating nonsensical IOI values'
                 }
             
             return {
-                'timing_type': 'score_row_constraint',
-                'last_match_time': f"{prev_time:.3f}s",
-                'current_note_time': f"{curr_time:.3f}s", 
-                'score_row_gap': f"{score_row_gap:.3f}s",
+                'timing_type': 'valid_constraint_check',
+                'prev_time': f"{prev_time:.3f}s",
+                'current_time': f"{curr_time:.3f}s", 
+                'ioi': f"{ioi_value:.3f}s",
                 'constraint_limit': self._estimate_score_ioi(constraint_type),
-                'interpretation': f'Time since this score row last matched a note: {score_row_gap:.3f}s',
+                'interpretation': f'Valid timing constraint: IOI {ioi_value:.3f}s vs limit {self._estimate_score_ioi(constraint_type)}s',
                 'constraint_type': constraint_type
             }
         except Exception as e:
-            return {'error': f"Score row timing analysis failed: {e}"}
+            return {'error': f"Timing analysis failed: {e}"}
     
     def _estimate_score_ioi(self, constraint_type: str) -> Optional[float]:
         """Estimate expected score IOI based on constraint type."""

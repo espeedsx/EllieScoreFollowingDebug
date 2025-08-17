@@ -344,27 +344,28 @@ Focus on actionable insights that can guide algorithm improvements.
             # Add detailed timing failure analysis
             detailed_failures = timing_data.get('detailed_failures', [])
             if detailed_failures:
-                sections.append("\n**Detailed Score Row Timing Failures:**")
+                sections.append("\n**Detailed Algorithm Analysis:**")
                 for i, failure in enumerate(detailed_failures):
-                    score_row_gap = failure.get('score_row_gap', failure.get('ioi', 0))
+                    ioi_value = failure.get('ioi_value', failure.get('ioi', 0))
                     timing_limit = failure.get('timing_limit', failure.get('limit', 0))
                     excess_ms = failure.get('excess_ms', 0)
                     prev_time = failure.get('prev_time', -1)
-                    score_context = failure.get('score_timing_context', {})
+                    algorithm_context = failure.get('algorithm_context', {})
                     
-                    sections.append(f"  {i+1}. Score Row Gap: {score_row_gap:.3f}s > Timing Limit: {timing_limit:.3f}s")
+                    sections.append(f"  {i+1}. IOI Value: {ioi_value:.3f}s > Timing Limit: {timing_limit:.3f}s")
                     sections.append(f"      Excess: {excess_ms:.1f}ms | Constraint: {failure['constraint_type']} | Current Time: {failure['time']:.3f}s")
                     
-                    # Explain the timing constraint context
-                    if prev_time < 0:
-                        sections.append(f"      Context: Score row never matched (uninitialized) - cannot group with {failure['constraint_type']} timing")
-                    else:
-                        sections.append(f"      Context: Score row last matched at {prev_time:.3f}s - gap too large for {failure['constraint_type']} grouping")
-                    
-                    if score_context:
-                        interpretation = score_context.get('interpretation', '')
-                        if interpretation:
-                            sections.append(f"      Analysis: {interpretation}")
+                    # Show the algorithm bug detection
+                    if algorithm_context:
+                        timing_type = algorithm_context.get('timing_type', '')
+                        if timing_type == 'algorithm_bug':
+                            sections.append(f"      *** ALGORITHM BUG DETECTED ***: {algorithm_context.get('bug_type', 'unknown')}")
+                            sections.append(f"      Calculation: {algorithm_context.get('calculation', 'unknown')}")
+                            sections.append(f"      Bug Description: {algorithm_context.get('bug_description', 'unknown')}")
+                        else:
+                            interpretation = algorithm_context.get('interpretation', '')
+                            if interpretation:
+                                sections.append(f"      Analysis: {interpretation}")
         
         # Match Type Analysis
         if 'match_type_analysis' not in comprehensive_context:
