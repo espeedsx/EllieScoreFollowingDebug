@@ -9,8 +9,13 @@
       "Bash(grep:*)",
       "Bash(sed:*)",
       "Bash(move:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(pip install:*)",
+      "Bash(timeout:*)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "C:\\c\\Repos\\EllieScoreFollowingDebug"
+    ]
   }
 }

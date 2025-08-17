@@ -1,0 +1,146 @@
+# Score Following Algorithm Failure Analysis
+
+## Context
+You are analyzing a failure in a real-time score following algorithm that uses dynamic programming to match musical performance notes against a musical score. The algorithm maintains a matrix where rows represent score events and columns represent performance events.
+
+## Failure Details
+- **Failure Type**: no_match
+- **Time**: 28.307 seconds
+- **Pitch**: 67 (MIDI note number)
+- **Expected**: Match for pitch 67 at time 28.307
+- **Actual**: No match found
+
+## Algorithm Context
+The dynamic programming algorithm uses these key components:
+- **Vertical Rule**: Advance in score without matching (penalty for missing notes)
+- **Horizontal Rule**: Match performance note to score note (credit for matches)
+- **Final Value**: Maximum of vertical and horizontal rule values
+- **Used Pitches**: Notes already matched in current chord
+- **Unused Count**: Number of expected notes not yet matched
+
+## Decision Sequence Leading to Failure
+Decision 1: Row 83, Pitch 67, Time 28.307s
+  - Vertical rule: 241.0
+  - Horizontal rule: 241.0
+  - Final value: 241.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 2: Row 84, Pitch 67, Time 28.307s
+  - Vertical rule: 239.0
+  - Horizontal rule: 239.0
+  - Final value: 239.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 2
+
+Decision 3: Row 85, Pitch 67, Time 28.307s
+  - Vertical rule: 235.0
+  - Horizontal rule: 235.0
+  - Final value: 235.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 4: Row 86, Pitch 67, Time 28.307s
+  - Vertical rule: 233.0
+  - Horizontal rule: 233.0
+  - Final value: 233.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 2
+
+Decision 5: Row 87, Pitch 67, Time 28.307s
+  - Vertical rule: 229.0
+  - Horizontal rule: 229.0
+  - Final value: 229.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+## Score Progression
+The algorithm's confidence scores leading to the failure:
+241.0 -> 239.0 -> 235.0 -> 233.0 -> 229.0
+Trend: decreasing (from 241.0 to 229.0)
+
+## Timing Analysis
+- Decision span: 0.000 seconds
+- Average inter-onset interval: 0.000s
+- Maximum gap: 0.000s
+- Time to failure: 0.000s
+
+## Preceding Successful Matches
+Match 1: Pitch 71 at 28.194s, Score 248.0
+Match 2: Pitch 62 at 28.212s, Score 250.0
+Match 3: Pitch 67 at 28.212s, Score 252.0
+
+## Ultra-Comprehensive Algorithm Analysis
+
+### Timing Constraint Details
+- **Total timing checks**: 0
+- **Failed checks**: 0
+- **Passed checks**: 0
+
+### Match Type Classification
+
+### Horizontal Rule Calculations
+- **Total calculations**: 0
+- **Timing failures**: 0
+
+### Cell Decision Analysis
+- **Total decisions**: 0
+- **Cell updates**: 0
+
+### Score Competition State
+- **Beats top score**: False
+
+### Ornament Processing
+- **Ornaments present**: False
+- **Credit applied**: 0
+
+### Algorithmic Insights
+- **Likely timing issue**: False
+- **Ornament interference**: False
+- **Score competition active**: False
+- **Decision complexity**: 0 different decision reasons
+
+## Your Task
+Analyze this failure using the ultra-detailed algorithm data and provide insights on:
+
+1. **Root Cause Analysis**: 
+   - What specific algorithm decision or parameter likely caused this failure?
+   - Which timing constraint check failed and why?
+   - Did the horizontal/vertical rule calculations contribute to the failure?
+
+2. **Decision Tree Deep Dive**: 
+   - How did the sequence of cell decisions lead to the wrong outcome?
+   - Which decision winner (vertical vs horizontal) was chosen incorrectly?
+   - What match type classifications affected the final decision?
+
+3. **Timing Constraint Analysis**: 
+   - Which specific timing checks failed for this pitch?
+   - Are the IOI (inter-onset interval) limits appropriate for this musical context?
+   - How do the timing constraints compare to successful nearby matches?
+
+4. **Algorithm State Investigation**:
+   - What was the score competition state when the failure occurred?
+   - How did the confidence levels evolve leading to the failure?
+   - Were there ornament processing complications (trills, grace notes)?
+
+5. **Parameter Optimization**:
+   - Which timing limits need adjustment (chord_basic vs chord vs trill vs grace)?
+   - Should the penalty values for extra notes be modified?
+   - Are the scoring credits for matches appropriately balanced?
+
+6. **Strategic Algorithmic Improvements**:
+   - Would alternative match type classification help?
+   - Should the window management strategy be adjusted?
+   - What preprocessing could prevent this type of failure?
+
+7. **Implementation Fixes**:
+   - Specific code changes to prevent this failure type
+   - Parameter value recommendations with rationale
+   - Testing strategies to validate improvements
+
+Please reference the specific algorithm data points, timing values, decision winners, and match type classifications in your analysis.

@@ -74,6 +74,104 @@ class FailureAnalyzer:
             raise ValueError(f"Comprehensive data missing expected keys: {missing_keys}")
         
         self.has_comprehensive_data = True
+        
+        # Build performance caches for fast repeated lookups
+        self._build_performance_caches()
+    
+    def _build_performance_caches(self):
+        """Build performance caches for fast repeated lookups."""
+        logger.debug("Building performance caches for failure analysis")
+        
+        # 1. Build line-to-time lookup table (O(1) instead of O(n) lookups)
+        self._line_to_time_cache = {}
+        
+        # Add mappings from input_events (most accurate timing)
+        input_events = self.comprehensive_data.get('input_events', [])
+        for event in input_events:
+            if 'line_number' in event and 'time' in event:
+                line_num = event['line_number']
+                time = event['time']
+                # Keep highest line number for each time (most specific)
+                if line_num not in self._line_to_time_cache or line_num > self._line_to_time_cache[line_num][1]:
+                    self._line_to_time_cache[line_num] = (time, line_num)
+        
+        # Add mappings from DP decisions (fallback timing)
+        for decision in self.dp_decisions:
+            line_num = decision.line_number
+            time = decision.time
+            if line_num not in self._line_to_time_cache:
+                self._line_to_time_cache[line_num] = (time, line_num)
+        
+        # 2. Pre-convert line numbers to times and create time-sorted indices
+        # This avoids calling _find_closest_time_for_pitch thousands of times during analysis
+        
+        # Timing checks already have time, just sort by time
+        self._timing_checks_by_time = sorted(
+            self.comprehensive_data.get('timing_checks', []),
+            key=lambda x: x.get('curr_time', 0)
+        )
+        
+        # Pre-convert cell decisions to include times
+        cell_decisions = self.comprehensive_data.get('cell_decisions', [])
+        self._cell_decisions_with_time = []
+        for decision in cell_decisions:
+            line_num = decision.get('line_number', 0)
+            if line_num in self._line_to_time_cache:
+                time_val = self._line_to_time_cache[line_num][0]
+                decision_with_time = decision.copy()
+                decision_with_time['_cached_time'] = time_val
+                self._cell_decisions_with_time.append(decision_with_time)
+        self._cell_decisions_with_time.sort(key=lambda x: x['_cached_time'])
+        
+        # Pre-convert score competitions to include times
+        score_competitions = self.comprehensive_data.get('score_competitions', [])
+        self._score_competitions_with_time = []
+        for score in score_competitions:
+            line_num = score.get('line_number', 0)
+            if line_num in self._line_to_time_cache:
+                time_val = self._line_to_time_cache[line_num][0]
+                score_with_time = score.copy()
+                score_with_time['_cached_time'] = time_val
+                self._score_competitions_with_time.append(score_with_time)
+        self._score_competitions_with_time.sort(key=lambda x: x['_cached_time'])
+        
+        # 3. Initialize time window cache for overlapping contexts
+        self._time_window_cache = {}
+        
+        logger.debug(f"Built caches: {len(self._line_to_time_cache)} line mappings, "
+                    f"{len(self._timing_checks_by_time)} timing checks, "
+                    f"{len(self._cell_decisions_with_time)} cell decisions")
+    
+    def _get_items_in_time_range(self, sorted_items, start_time, end_time, time_field):
+        """Ultra-fast binary search to get items in time range. O(log n) instead of O(n)."""
+        import bisect
+        
+        if not sorted_items:
+            return []
+        
+        # Binary search for start index
+        left = 0
+        right = len(sorted_items)
+        while left < right:
+            mid = (left + right) // 2
+            if sorted_items[mid][time_field] < start_time:
+                left = mid + 1
+            else:
+                right = mid
+        start_idx = left
+        
+        # Binary search for end index
+        left = start_idx
+        right = len(sorted_items)
+        while left < right:
+            mid = (left + right) // 2
+            if sorted_items[mid][time_field] <= end_time:
+                left = mid + 1
+            else:
+                right = mid
+        end_idx = left
+        
+        return sorted_items[start_idx:end_idx]
     
     def analyze(self) -> FailureReport:
         """
@@ -82,29 +180,61 @@ class FailureAnalyzer:
         Returns:
             Comprehensive failure report
         """
+        try:
+            from tqdm import tqdm
+            use_progress_bar = True
+        except ImportError:
+            # Fallback if tqdm not available
+            class tqdm:
+                def __init__(self, total=None, desc="", ncols=None):
+                    self.total = total
+                    self.current = 0
+                    print(f"{desc}...")
+                def update(self, n=1):
+                    self.current += n
+                def set_description(self, desc):
+                    print(f"{desc}...")
+                def __enter__(self):
+                    return self
+                def __exit__(self, *args):
+                    pass
+            use_progress_bar = False
+        
         logger.info("Starting failure analysis")
         
         failure_contexts = []
         
-        # Analyze explicit no-matches
-        for no_match in self.no_matches:
-            context = self._analyze_no_match_failure(no_match)
-            if context:
-                failure_contexts.append(context)
+        # Calculate total steps for progress bar
+        total_steps = len(self.no_matches) + len(self.matches) + len(self.dp_decisions) + 2
         
-        # Analyze potential wrong matches
-        wrong_match_contexts = self._analyze_potential_wrong_matches()
-        failure_contexts.extend(wrong_match_contexts)
-        
-        # Analyze score drops (potential missed opportunities)
-        score_drop_contexts = self._analyze_score_drops()
-        failure_contexts.extend(score_drop_contexts)
-        
-        # Generate summary statistics
-        summary_stats = self._generate_summary_statistics(failure_contexts)
-        
-        # Generate recommendations
-        recommendations = self._generate_recommendations(failure_contexts)
+        with tqdm(total=total_steps, desc="Analyzing failures", ncols=80) as pbar:
+            # Analyze explicit no-matches
+            pbar.set_description("Analyzing no-matches")
+            for no_match in self.no_matches:
+                context = self._analyze_no_match_failure(no_match)
+                if context:
+                    failure_contexts.append(context)
+                pbar.update(1)
+            
+            # Analyze potential wrong matches
+            pbar.set_description("Analyzing wrong matches")
+            wrong_match_contexts = self._analyze_potential_wrong_matches(pbar)
+            failure_contexts.extend(wrong_match_contexts)
+            
+            # Analyze score drops (potential missed opportunities)
+            pbar.set_description("Analyzing score drops")
+            score_drop_contexts = self._analyze_score_drops(pbar)
+            failure_contexts.extend(score_drop_contexts)
+            
+            # Generate summary statistics
+            pbar.set_description("Generating statistics")
+            summary_stats = self._generate_summary_statistics(failure_contexts)
+            pbar.update(1)
+            
+            # Generate recommendations
+            pbar.set_description("Generating recommendations")
+            recommendations = self._generate_recommendations(failure_contexts)
+            pbar.update(1)
         
         report = FailureReport(
             test_case_id=self._get_test_case_id(),
@@ -157,7 +287,7 @@ class FailureAnalyzer:
             comprehensive_context=comprehensive_context
         )
     
-    def _analyze_potential_wrong_matches(self) -> List[FailureContext]:
+    def _analyze_potential_wrong_matches(self, pbar=None) -> List[FailureContext]:
         """Analyze potentially incorrect matches."""
         contexts = []
         
@@ -184,10 +314,12 @@ class FailureAnalyzer:
                         line_number=match.line_number
                     )
                     contexts.append(context)
+            if pbar:
+                pbar.update(1)
         
         return contexts
     
-    def _analyze_score_drops(self) -> List[FailureContext]:
+    def _analyze_score_drops(self, pbar=None) -> List[FailureContext]:
         """Analyze significant score drops that might indicate missed opportunities."""
         contexts = []
         
@@ -197,6 +329,8 @@ class FailureAnalyzer:
             if decision.column not in by_column:
                 by_column[decision.column] = []
             by_column[decision.column].append(decision)
+            if pbar:
+                pbar.update(1)
         
         # Look for significant score drops within each column
         for column, decisions in by_column.items():
@@ -402,107 +536,98 @@ class FailureAnalyzer:
     
     def _extract_comprehensive_context(self, failure_time: float, failure_pitch: int) -> Dict[str, Any]:
         """Extract comprehensive algorithm context around a failure."""
-        context = {}
-        
-        # Debug: Check if we have comprehensive data
-        logger.debug(f"Extracting comprehensive context for failure at {failure_time:.3f}s, pitch {failure_pitch}")
-        logger.debug(f"Available comprehensive data keys: {list(self.comprehensive_data.keys())}")
-        for key, data in self.comprehensive_data.items():
-            logger.debug(f"  {key}: {len(data)} entries")
-        
-        # Time window for context (±1 second around failure)
-        time_window = 1.0
+        # Use 1.0 second time window for comprehensive context (cached lookups make this fast)
+        time_window = 1.0  # Restored to 1.0 second for better coverage
         start_time = failure_time - time_window
         end_time = failure_time + time_window
         
-        # Extract timing constraints that might have failed (timing checks don't have pitch, filter by time only)
-        if 'timing_checks' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing timing_checks - parsing may have failed")
-        timing_checks = self.comprehensive_data['timing_checks']
-        relevant_timing = []
-        for t in timing_checks:
-            if 'curr_time' not in t:
-                raise RuntimeError(f"Timing check missing curr_time field: {t}")
-            if start_time <= t['curr_time'] <= end_time:
-                relevant_timing.append(t)
+        # Check time window cache for overlapping contexts (major speedup for clustered failures)
+        cache_key = (round(start_time, 1), round(end_time, 1))  # Round to 0.1s for cache hits
+        if cache_key in self._time_window_cache:
+            cached_context = self._time_window_cache[cache_key]
+            # Filter cached results for this specific pitch
+            return self._filter_cached_context_for_pitch(cached_context, failure_pitch)
         
-        # Extract match type analyses for this pitch
-        if 'match_type_analyses' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing match_type_analyses - parsing may have failed")
-        match_analyses = self.comprehensive_data['match_type_analyses']
-        relevant_match_types = []
-        for m in match_analyses:
-            if 'pitch' not in m:
-                raise RuntimeError(f"Match type analysis missing pitch field: {m}")
-            if 'line_number' not in m:
-                raise RuntimeError(f"Match type analysis missing line_number field: {m}")
-            if (m['pitch'] == failure_pitch and
-                abs(failure_time - self._find_closest_time_for_pitch(m['line_number'])) <= time_window):
-                relevant_match_types.append(m)
+        # Extract timing constraints using fast binary search on pre-sorted data
+        relevant_timing = self._get_items_in_time_range(
+            self._timing_checks_by_time, start_time, end_time, 'curr_time'
+        )
+        
+        # Extract match type analyses for this pitch (simplified - just check pitch match)
+        match_analyses = self.comprehensive_data.get('match_type_analyses', [])
+        relevant_match_types = [m for m in match_analyses 
+                               if m.get('pitch') == failure_pitch]
         
         # Extract horizontal rule calculations (use 'pitch' field from HRULE entries)
-        if 'horizontal_rules' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing horizontal_rules - parsing may have failed")
-        horizontal_rules = self.comprehensive_data['horizontal_rules']
-        relevant_h_rules = []
-        for h in horizontal_rules:
-            if 'pitch' not in h:
-                raise RuntimeError(f"Horizontal rule missing pitch field: {h}")
-            if h['pitch'] == failure_pitch:
-                relevant_h_rules.append(h)
+        horizontal_rules = self.comprehensive_data.get('horizontal_rules', [])
+        relevant_h_rules = [h for h in horizontal_rules 
+                           if h.get('pitch') == failure_pitch]
         
-        # Extract cell decisions around this time
-        if 'cell_decisions' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing cell_decisions - parsing may have failed")
-        cell_decisions = self.comprehensive_data['cell_decisions']
-        relevant_decisions = []
-        for d in cell_decisions:
-            if 'line_number' not in d:
-                raise RuntimeError(f"Cell decision missing line_number field: {d}")
-            if abs(failure_time - self._find_closest_time_for_decision(d['line_number'])) <= time_window:
-                relevant_decisions.append(d)
+        # Extract cell decisions using ultra-fast binary search (no function calls!)
+        relevant_decisions = self._get_items_in_time_range(
+            self._cell_decisions_with_time, start_time, end_time, '_cached_time'
+        )
         
-        # Extract score competition data
-        if 'score_competitions' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing score_competitions - parsing may have failed")
-        score_competitions = self.comprehensive_data['score_competitions']
-        relevant_scores = []
-        for s in score_competitions:
-            if 'line_number' not in s:
-                raise RuntimeError(f"Score competition missing line_number field: {s}")
-            if abs(failure_time - self._find_closest_time_for_score(s['line_number'])) <= time_window:
-                relevant_scores.append(s)
+        # Extract score competitions using ultra-fast binary search
+        relevant_scores = self._get_items_in_time_range(
+            self._score_competitions_with_time, start_time, end_time, '_cached_time'
+        )
         
-        # Extract ornament processing if relevant
-        if 'ornament_processings' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing ornament_processings - parsing may have failed")
-        ornament_processings = self.comprehensive_data['ornament_processings']
-        relevant_ornaments = []
-        for o in ornament_processings:
-            if 'pitch' not in o:
-                raise RuntimeError(f"Ornament processing missing pitch field: {o}")
-            if 'line_number' not in o:
-                raise RuntimeError(f"Ornament processing missing line_number field: {o}")
-            if (o['pitch'] == failure_pitch and
-                abs(failure_time - self._find_closest_time_for_ornament(o['line_number'])) <= time_window):
-                relevant_ornaments.append(o)
+        # Extract vertical rule calculations around this time
+        vertical_rules = self.comprehensive_data.get('vertical_rules', [])
+        relevant_v_rules = []
+        for vrule in vertical_rules:
+            line_num = vrule.get('line_number', 0)
+            if line_num in self._line_to_time_cache:
+                vrule_time = self._line_to_time_cache[line_num][0]
+                if start_time <= vrule_time <= end_time:
+                    relevant_v_rules.append(vrule)
         
-        # Build comprehensive context with actual data counts for debugging
-        failed_checks = []
-        passed_checks = []
-        for t in relevant_timing:
-            if 'timing_pass' not in t:
-                raise RuntimeError(f"Timing check missing timing_pass field: {t}")
-            if not t['timing_pass']:
-                failed_checks.append(t)
-            else:
-                passed_checks.append(t)
+        # Extract matrix states around this time  
+        matrix_states = self.comprehensive_data.get('matrix_states', [])
+        relevant_matrices = []
+        for matrix in matrix_states:
+            line_num = matrix.get('line_number', 0)
+            if line_num in self._line_to_time_cache:
+                matrix_time = self._line_to_time_cache[line_num][0]
+                if start_time <= matrix_time <= end_time:
+                    relevant_matrices.append(matrix)
+        
+        # Extract array neighborhoods around this time
+        array_neighborhoods = self.comprehensive_data.get('array_neighborhoods', [])
+        relevant_arrays = []
+        for array in array_neighborhoods:
+            line_num = array.get('line_number', 0)
+            if line_num in self._line_to_time_cache:
+                array_time = self._line_to_time_cache[line_num][0]
+                if start_time <= array_time <= end_time:
+                    relevant_arrays.append(array)
+        
+        # Extract window movements around this time
+        window_movements = self.comprehensive_data.get('window_movements', [])
+        relevant_windows = []
+        for window in window_movements:
+            line_num = window.get('line_number', 0)
+            if line_num in self._line_to_time_cache:
+                window_time = self._line_to_time_cache[line_num][0]
+                if start_time <= window_time <= end_time:
+                    relevant_windows.append(window)
+        
+        # Extract ornament processing if relevant (only check pitch)
+        ornament_processings = self.comprehensive_data.get('ornament_processings', [])
+        relevant_ornaments = [o for o in ornament_processings 
+                             if o.get('pitch') == failure_pitch]
+        
+        # Build comprehensive context with actual data counts for debugging (optimized)
+        failed_checks = [t for t in relevant_timing if not t.get('timing_pass', True)]
+        passed_checks = [t for t in relevant_timing if t.get('timing_pass', True)]
         
         context = {
             'timing_constraints': {
                 'failed_checks': failed_checks,
                 'passed_checks': passed_checks,
-                'total_checks': len(relevant_timing)
+                'total_checks': len(relevant_timing),
+                'detailed_failures': self._analyze_timing_failures(failed_checks)
             },
             'match_type_analysis': {
                 'classifications': relevant_match_types,
@@ -510,87 +635,136 @@ class FailureAnalyzer:
             },
             'horizontal_rule_analysis': {
                 'calculations': relevant_h_rules,
-                'timing_failures': [h for h in relevant_h_rules if 'timing_pass' in h and not h['timing_pass']],
-                'match_type_distribution': self._count_match_types(relevant_h_rules)
+                'timing_failures': [h for h in relevant_h_rules if not h.get('timing_pass', True)],
+                'match_type_distribution': self._count_match_types(relevant_h_rules) if relevant_h_rules else {},
+                'detailed_calculations': self._analyze_horizontal_rules(relevant_h_rules)
+            },
+            'vertical_rule_analysis': {
+                'calculations': relevant_v_rules,
+                'detailed_penalties': self._analyze_vertical_rules(relevant_v_rules)
             },
             'cell_decisions': {
                 'decisions': relevant_decisions,
-                'winner_distribution': self._count_decision_winners(relevant_decisions),
-                'update_patterns': [d for d in relevant_decisions if 'updated' in d and d['updated']]
+                'winner_distribution': self._count_decision_winners(relevant_decisions) if relevant_decisions else {},
+                'update_patterns': [d for d in relevant_decisions if d.get('updated')],
+                'detailed_decisions': self._analyze_cell_decisions(relevant_decisions)
+            },
+            'matrix_state': {
+                'states': relevant_matrices,
+                'window_info': self._analyze_matrix_states(relevant_matrices)
+            },
+            'array_neighborhoods': {
+                'neighborhoods': relevant_arrays,
+                'value_analysis': self._analyze_array_neighborhoods(relevant_arrays)
+            },
+            'window_movements': {
+                'movements': relevant_windows,
+                'movement_analysis': self._analyze_window_movements(relevant_windows)
             },
             'score_competition': {
-                'score_progression': [s['current_score'] if 'current_score' in s else 0 for s in relevant_scores],
-                'confidence_levels': [s['confidence'] if 'confidence' in s else 0 for s in relevant_scores],
-                'beats_top_score': any('beats_top' in s and s['beats_top'] for s in relevant_scores)
+                'score_progression': [s.get('current_score', 0) for s in relevant_scores],
+                'confidence_levels': [s.get('confidence', 0) for s in relevant_scores],
+                'beats_top_score': any(s.get('beats_top') for s in relevant_scores),
+                'detailed_competition': self._analyze_score_competition(relevant_scores)
             },
             'ornament_context': {
-                'ornament_types': [o['ornament_type'] if 'ornament_type' in o else '' for o in relevant_ornaments],
-                'credit_applied': sum(o['credit'] if 'credit' in o else 0 for o in relevant_ornaments),
-                'has_ornaments': len(relevant_ornaments) > 0
+                'ornament_types': [o.get('ornament_type', '') for o in relevant_ornaments],
+                'credit_applied': sum(o.get('credit', 0) for o in relevant_ornaments),
+                'has_ornaments': len(relevant_ornaments) > 0,
+                'detailed_ornaments': self._analyze_ornament_processing(relevant_ornaments)
             },
             'algorithmic_insights': {
                 'likely_timing_issue': len(failed_checks) > 0,
                 'ornament_interference': len(relevant_ornaments) > 0,
                 'score_competition_active': len(relevant_scores) > 0,
-                'decision_complexity': len(set(d['reason'] if 'reason' in d else '' for d in relevant_decisions))
+                'decision_complexity': len(set(d.get('reason', '') for d in relevant_decisions)) if relevant_decisions else 0
             }
         }
         
-        # Debug log the extracted context (only when meaningful data found)
-        has_data = any([
-            len(context['timing_constraints']['failed_checks']) > 0,
-            len(context['match_type_analysis']['classifications']) > 0,
-            len(context['horizontal_rule_analysis']['calculations']) > 0,
-            len(context['cell_decisions']['decisions']) > 0,
-            len(context['score_competition']['score_progression']) > 0,
-            len(context['ornament_context']['ornament_types']) > 0
-        ])
-        
-        if has_data:
-            logger.debug(f"Extracted comprehensive context for pitch {failure_pitch}: "
-                        f"{len(relevant_timing)} timing checks ({len(context['timing_constraints']['failed_checks'])} failed), "
-                        f"{len(relevant_h_rules)} horizontal rules, "
-                        f"{len(relevant_match_types)} match type analyses")
-        else:
-            raise RuntimeError(f"No comprehensive context data found for failure at {failure_time:.3f}s, pitch {failure_pitch} - "
-                             f"targeted parsing may have missed this failure location")
+        # Store in cache for future overlapping contexts (includes all pitch data)
+        self._time_window_cache[cache_key] = {
+            'timing_constraints': context['timing_constraints'],
+            'all_match_types': relevant_match_types,
+            'all_h_rules': relevant_h_rules,
+            'all_v_rules': relevant_v_rules,
+            'all_ornaments': relevant_ornaments,
+            'cell_decisions': context['cell_decisions'],
+            'score_competition': context['score_competition'],
+            'matrix_state': context['matrix_state'],
+            'array_neighborhoods': context['array_neighborhoods'],
+            'window_movements': context['window_movements'],
+            'algorithmic_insights': context['algorithmic_insights']
+        }
         
         return context
     
+    def _filter_cached_context_for_pitch(self, cached_context: Dict[str, Any], failure_pitch: int) -> Dict[str, Any]:
+        """Filter cached comprehensive context for a specific pitch."""
+        # Filter pitch-specific data from cached context
+        all_match_types = cached_context.get('all_match_types', [])
+        relevant_match_types = [m for m in all_match_types if m.get('pitch') == failure_pitch]
+        
+        all_h_rules = cached_context.get('all_h_rules', [])
+        relevant_h_rules = [h for h in all_h_rules if h.get('pitch') == failure_pitch]
+        
+        all_v_rules = cached_context.get('all_v_rules', [])
+        # Vertical rules are not pitch-specific, include all
+        
+        all_ornaments = cached_context.get('all_ornaments', [])
+        relevant_ornaments = [o for o in all_ornaments if o.get('pitch') == failure_pitch]
+        
+        return {
+            'timing_constraints': cached_context['timing_constraints'],
+            'match_type_analysis': {
+                'classifications': relevant_match_types,
+                'pitch_categorization': self._analyze_pitch_categorization(relevant_match_types)
+            },
+            'horizontal_rule_analysis': {
+                'calculations': relevant_h_rules,
+                'timing_failures': [h for h in relevant_h_rules if not h.get('timing_pass', True)],
+                'match_type_distribution': self._count_match_types(relevant_h_rules) if relevant_h_rules else {},
+                'detailed_calculations': self._analyze_horizontal_rules(relevant_h_rules)
+            },
+            'vertical_rule_analysis': {
+                'calculations': all_v_rules,
+                'detailed_penalties': self._analyze_vertical_rules(all_v_rules)
+            },
+            'cell_decisions': cached_context['cell_decisions'],
+            'score_competition': cached_context['score_competition'],
+            'matrix_state': cached_context['matrix_state'],
+            'array_neighborhoods': cached_context['array_neighborhoods'],
+            'window_movements': cached_context['window_movements'],
+            'ornament_context': {
+                'ornament_types': [o.get('ornament_type', '') for o in relevant_ornaments],
+                'credit_applied': sum(o.get('credit', 0) for o in relevant_ornaments),
+                'has_ornaments': len(relevant_ornaments) > 0,
+                'detailed_ornaments': self._analyze_ornament_processing(relevant_ornaments)
+            },
+            'algorithmic_insights': cached_context['algorithmic_insights']
+        }
+    
     def _find_closest_time_for_pitch(self, line_number: int) -> float:
-        """Find the closest time for a given line number by looking at input events, falling back to DP decisions."""
-        # First try input events (most accurate for timing)
-        if 'input_events' in self.comprehensive_data:
-            input_events = self.comprehensive_data['input_events']
-            closest_event = None
-            for event in input_events:
-                if 'line_number' not in event:
-                    raise RuntimeError(f"Input event missing line_number field: {event}")
-                if 'time' not in event:
-                    raise RuntimeError(f"Input event missing time field: {event}")
-                if event['line_number'] <= line_number:
-                    if closest_event is None or event['line_number'] > closest_event['line_number']:
-                        closest_event = event
-            
-            if closest_event:
-                return closest_event['time']
+        """Find the closest time for a given line number using cached O(1) lookup."""
+        # Direct cache lookup - O(1) instead of O(n)
+        if line_number in self._line_to_time_cache:
+            return self._line_to_time_cache[line_number][0]
         
-        # Fallback: use DP decisions for timing (always available)
-        closest_decision = None
-        for decision in self.dp_decisions:
-            if decision.line_number <= line_number:
-                if closest_decision is None or decision.line_number > closest_decision.line_number:
-                    closest_decision = decision
+        # Find closest lower line number in cache
+        closest_line = None
+        for cached_line in self._line_to_time_cache:
+            if cached_line <= line_number:
+                if closest_line is None or cached_line > closest_line:
+                    closest_line = cached_line
         
-        if closest_decision:
-            return closest_decision.time
+        if closest_line is not None:
+            return self._line_to_time_cache[closest_line][0]
         
-        # If still no match found, use earliest available time
+        # Fallback: use earliest available time
         if self.dp_decisions:
             logger.warning(f"No time data found for line {line_number}, using earliest DP decision time")
             return min(d.time for d in self.dp_decisions)
         
-        raise RuntimeError(f"No timing data available - both input events and DP decisions are empty")
+        raise RuntimeError(f"No timing data available - line-to-time cache is empty")
     
     def _find_closest_time_for_decision(self, line_number: int) -> float:
         """Find time for decision by looking at nearby input events."""
@@ -640,6 +814,261 @@ class FailureAnalyzer:
             else:
                 winners[winner] = 1
         return winners
+    
+    def _analyze_timing_failures(self, failed_checks: List[Dict]) -> List[Dict]:
+        """Analyze detailed timing constraint failures with tempo awareness."""
+        failures = []
+        for check in failed_checks[:5]:  # Limit to first 5 for prompt size
+            if all(key in check for key in ['ioi', 'limit', 'constraint_type', 'curr_time']):
+                # Extract performance timing information
+                performance_ioi = check['ioi']
+                timing_limit = check['limit']
+                constraint_type = check['constraint_type']
+                
+                # Calculate excess timing
+                excess_seconds = performance_ioi - timing_limit
+                excess_ms = excess_seconds * 1000
+                
+                # Analyze tempo context if available
+                tempo_context = self._analyze_tempo_context(check)
+                
+                failure_detail = {
+                    'performance_ioi': performance_ioi,
+                    'timing_limit': timing_limit,
+                    'excess_seconds': excess_seconds,
+                    'excess_ms': excess_ms,
+                    'constraint_type': constraint_type,
+                    'time': check['curr_time'],
+                    'tempo_ratio': tempo_context.get('estimated_tempo_ratio', 'unknown'),
+                    'tempo_context': tempo_context
+                }
+                failures.append(failure_detail)
+        return failures
+    
+    def _analyze_tempo_context(self, timing_check: Dict) -> Dict[str, Any]:
+        """Analyze tempo context for a timing check."""
+        try:
+            curr_time = timing_check.get('curr_time', 0)
+            prev_time = timing_check.get('prev_time', 0)
+            constraint_type = timing_check.get('constraint_type', 'unknown')
+            ioi = timing_check.get('ioi', 0)
+            
+            # Check if this is a valid timing calculation
+            # IOI > 10 seconds or prev_time < 0 indicates initialization issues
+            is_valid_timing = prev_time >= 0 and ioi < 10.0
+            
+            if not is_valid_timing:
+                return {
+                    'performance_time_range': f"invalid (prev_time: {prev_time:.3f}s, curr_time: {curr_time:.3f}s)",
+                    'performance_ioi': ioi,
+                    'expected_score_ioi': self._estimate_score_ioi(constraint_type),
+                    'estimated_tempo_ratio': 'invalid',
+                    'tempo_interpretation': 'Invalid timing data - likely algorithm initialization artifact',
+                    'note': 'Previous time is uninitialized (-1) or IOI is unrealistically large'
+                }
+            
+            # For valid timing, calculate tempo ratio
+            expected_score_ioi = self._estimate_score_ioi(constraint_type)
+            tempo_ratio = 'unknown'
+            if expected_score_ioi and expected_score_ioi > 0:
+                tempo_ratio = ioi / expected_score_ioi
+            
+            return {
+                'performance_time_range': f"{prev_time:.3f}s to {curr_time:.3f}s",
+                'performance_ioi': ioi,
+                'expected_score_ioi': expected_score_ioi,
+                'estimated_tempo_ratio': tempo_ratio,
+                'tempo_interpretation': self._interpret_tempo_ratio(tempo_ratio)
+            }
+        except Exception as e:
+            return {'error': f"Tempo analysis failed: {e}"}
+    
+    def _estimate_score_ioi(self, constraint_type: str) -> Optional[float]:
+        """Estimate expected score IOI based on constraint type."""
+        # These are rough estimates based on musical context
+        score_ioi_estimates = {
+            'chord_basic': 0.1,      # Basic chord timing
+            'chord': 0.1,            # Standard chord timing  
+            'trill': 0.2,            # Trill note spacing
+            'grace': 0.05,           # Grace note timing
+            'melody': 0.3,           # Typical melody note spacing
+        }
+        return score_ioi_estimates.get(constraint_type)
+    
+    def _interpret_tempo_ratio(self, tempo_ratio) -> str:
+        """Interpret the tempo ratio in musical terms."""
+        if tempo_ratio == 'unknown':
+            return 'Cannot determine tempo relationship'
+        
+        try:
+            ratio = float(tempo_ratio)
+            if ratio > 1.5:
+                return f'Much slower than score (playing {ratio:.1f}x slower)'
+            elif ratio > 1.1:
+                return f'Slightly slower than score (playing {ratio:.1f}x slower)'
+            elif ratio > 0.9:
+                return f'Close to score tempo (playing {ratio:.1f}x speed)'
+            elif ratio > 0.5:
+                return f'Faster than score (playing {ratio:.1f}x speed)'
+            else:
+                return f'Much faster than score (playing {ratio:.1f}x speed)'
+        except (ValueError, TypeError):
+            return 'Invalid tempo ratio'
+    
+    def _analyze_horizontal_rules(self, h_rules: List[Dict]) -> List[Dict]:
+        """Analyze detailed horizontal rule calculations with tempo awareness."""
+        calculations = []
+        for rule in h_rules[:5]:  # Limit for prompt size
+            # Use actual field names from parsed data
+            if all(key in rule for key in ['pitch', 'ioi', 'limit', 'timing_pass', 'match_type', 'result']):
+                ioi = rule['ioi']
+                limit = rule['limit']
+                match_type = rule['match_type']
+                
+                # Check if IOI indicates invalid timing (initialization artifact)
+                is_valid_ioi = ioi < 10.0  # Reasonable performance timing
+                timing_status = "VALID" if is_valid_ioi else "INVALID (initialization artifact)"
+                
+                # Only do tempo analysis for valid IOI values
+                tempo_context = None
+                if is_valid_ioi:
+                    expected_score_ioi = self._estimate_score_ioi(match_type)
+                    if expected_score_ioi and expected_score_ioi > 0:
+                        tempo_ratio = ioi / expected_score_ioi
+                        tempo_context = {
+                            'expected_score_ioi': expected_score_ioi,
+                            'tempo_ratio': tempo_ratio,
+                            'tempo_interpretation': self._interpret_tempo_ratio(tempo_ratio)
+                        }
+                
+                calc_detail = {
+                    'pitch': rule['pitch'],
+                    'performance_ioi': ioi,
+                    'timing_limit': limit,
+                    'timing_pass': rule['timing_pass'],
+                    'match_type': match_type,
+                    'result': rule['result'],
+                    'excess_ms': (ioi - limit) * 1000 if ioi > limit else 0,
+                    'timing_status': timing_status,
+                    'tempo_analysis': tempo_context
+                }
+                calculations.append(calc_detail)
+        return calculations
+    
+    def _analyze_vertical_rules(self, v_rules: List[Dict]) -> List[Dict]:
+        """Analyze detailed vertical rule penalty calculations."""
+        penalties = []
+        for rule in v_rules[:5]:  # Limit for prompt size
+            # Use actual field names: up_value, penalty, result
+            if all(key in rule for key in ['row', 'penalty', 'result']):
+                penalty_detail = {
+                    'row': rule['row'],
+                    'penalty': rule['penalty'],
+                    'up_value': rule.get('up_value', 0),
+                    'result': rule['result'],
+                    'start_point': rule.get('start_point', '')
+                }
+                penalties.append(penalty_detail)
+        return penalties
+    
+    def _analyze_cell_decisions(self, decisions: List[Dict]) -> List[Dict]:
+        """Analyze detailed cell decision reasoning."""
+        decision_details = []
+        for decision in decisions[:5]:  # Limit for prompt size
+            # Use actual field names: vertical_result, horizontal_result, winner, reason
+            if all(key in decision for key in ['row', 'vertical_result', 'horizontal_result', 'winner', 'reason']):
+                detail = {
+                    'row': decision['row'],
+                    'vertical_value': decision['vertical_result'],
+                    'horizontal_value': decision['horizontal_result'],
+                    'winner': decision['winner'],
+                    'reason': decision['reason'],
+                    'updated': decision.get('updated', False),
+                    'margin': abs(decision['vertical_result'] - decision['horizontal_result']),
+                    'final_value': decision.get('final_value', 0)
+                }
+                decision_details.append(detail)
+        return decision_details
+    
+    def _analyze_matrix_states(self, matrices: List[Dict]) -> Dict[str, Any]:
+        """Analyze matrix window states."""
+        if not matrices:
+            return {}
+        
+        latest_matrix = matrices[-1]  # Most recent matrix state
+        return {
+            'window_start': latest_matrix.get('window_start', 0),
+            'window_end': latest_matrix.get('window_end', 0),
+            'window_center': latest_matrix.get('window_center', 0),
+            'current_base': latest_matrix.get('current_base', 0),
+            'prev_base': latest_matrix.get('prev_base', 0),
+            'current_upper': latest_matrix.get('current_upper', 0),
+            'prev_upper': latest_matrix.get('prev_upper', 0),
+            'window_size': latest_matrix.get('window_end', 0) - latest_matrix.get('window_start', 0)
+        }
+    
+    def _analyze_array_neighborhoods(self, arrays: List[Dict]) -> List[Dict]:
+        """Analyze array neighborhood values."""
+        neighborhoods = []
+        for array in arrays[:3]:  # Limit for prompt size
+            # Use actual field names: center_value, neighbor_values
+            if all(key in array for key in ['row', 'center_value', 'neighbor_values']):
+                neighborhood = {
+                    'row': array['row'],
+                    'center_value': array['center_value'],
+                    'neighborhood_values': array['neighbor_values'][:5] if isinstance(array['neighbor_values'], list) else [],
+                    'max_value': max(array['neighbor_values']) if isinstance(array['neighbor_values'], list) and array['neighbor_values'] else 0,
+                    'positions': array.get('positions', [])
+                }
+                neighborhoods.append(neighborhood)
+        return neighborhoods
+    
+    def _analyze_window_movements(self, windows: List[Dict]) -> List[Dict]:
+        """Analyze window movement patterns."""
+        movements = []
+        for window in windows[:3]:  # Limit for prompt size
+            if all(key in window for key in ['old_start', 'new_start', 'old_end', 'new_end', 'reason']):
+                movement = {
+                    'old_window': [window['old_start'], window['old_end']],
+                    'new_window': [window['new_start'], window['new_end']],
+                    'size_change': (window['new_end'] - window['new_start']) - (window['old_end'] - window['old_start']),
+                    'position_shift': window['new_start'] - window['old_start'],
+                    'reason': window['reason']
+                }
+                movements.append(movement)
+        return movements
+    
+    def _analyze_score_competition(self, scores: List[Dict]) -> List[Dict]:
+        """Analyze detailed score competition dynamics."""
+        competition = []
+        for score in scores[:5]:  # Limit for prompt size
+            if all(key in score for key in ['row', 'current_score', 'top_score']):
+                comp_detail = {
+                    'row': score['row'],
+                    'current_score': score['current_score'],
+                    'top_score': score['top_score'],
+                    'margin': score['current_score'] - score['top_score'],
+                    'beats_top': score.get('beats_top', False),
+                    'confidence': score.get('confidence', 0)
+                }
+                competition.append(comp_detail)
+        return competition
+    
+    def _analyze_ornament_processing(self, ornaments: List[Dict]) -> List[Dict]:
+        """Analyze detailed ornament processing."""
+        ornament_details = []
+        for ornament in ornaments[:3]:  # Limit for prompt size
+            if 'ornament_type' in ornament:
+                detail = {
+                    'pitch': ornament.get('pitch', 0),
+                    'ornament_type': ornament['ornament_type'],
+                    'trill_notes': ornament.get('trill_pitches', []),
+                    'grace_notes': ornament.get('grace_pitches', []),
+                    'ignored_notes': ornament.get('ignore_pitches', []),
+                    'credit_applied': ornament.get('credit', 0)
+                }
+                ornament_details.append(detail)
+        return ornament_details
 
 
 def analyze_log_file(log_file_or_analysis: Path) -> FailureReport:

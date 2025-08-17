@@ -80,6 +80,12 @@ The dynamic programming algorithm uses these key components:
 - **Used Pitches**: Notes already matched in current chord
 - **Unused Count**: Number of expected notes not yet matched
 
+**Key Timing Concepts:**
+- **Performance Time**: Actual timing of performed notes (may vary from score tempo)
+- **Performance IOI**: Time intervals between consecutive performance notes
+- **Algorithm Limits**: Timing constraints based on musical context (chord, trill, grace notes)
+- **Tempo Relationship**: How performance speed compares to expected score timing
+
 ## Decision Sequence Leading to Failure
 {context_summary}
 
@@ -108,10 +114,11 @@ Analyze this failure using the ultra-detailed algorithm data and provide insight
    - Which decision winner (vertical vs horizontal) was chosen incorrectly?
    - What match type classifications affected the final decision?
 
-3. **Timing Constraint Analysis**: 
-   - Which specific timing checks failed for this pitch?
-   - Are the IOI (inter-onset interval) limits appropriate for this musical context?
-   - How do the timing constraints compare to successful nearby matches?
+3. **Performance Timing Analysis**: 
+   - Which specific performance timing checks failed for this pitch?
+   - How does the performance IOI (time between consecutive performance notes) compare to algorithm limits?
+   - Is the performance playing faster/slower than expected score tempo?
+   - Are the timing constraint limits appropriate for this musical context and performance tempo?
 
 4. **Algorithm State Investigation**:
    - What was the score competition state when the failure occurred?
@@ -333,6 +340,29 @@ Focus on actionable insights that can guide algorithm improvements.
                         if field not in check:
                             raise ValueError(f"Failed timing check {i+1} missing required field '{field}': {check}")
                     sections.append(f"  {i+1}. IOI: {check['ioi']:.3f}s > Limit: {check['limit']:.3f}s (Type: {check['constraint_type']})")
+            
+            # Add detailed timing failure analysis with tempo awareness
+            detailed_failures = timing_data.get('detailed_failures', [])
+            if detailed_failures:
+                sections.append("\n**Detailed Performance Timing Failures:**")
+                for i, failure in enumerate(detailed_failures):
+                    performance_ioi = failure.get('performance_ioi', failure.get('ioi', 0))
+                    timing_limit = failure.get('timing_limit', failure.get('limit', 0))
+                    excess_ms = failure.get('excess_ms', 0)
+                    tempo_ratio = failure.get('tempo_ratio', 'unknown')
+                    tempo_context = failure.get('tempo_context', {})
+                    
+                    sections.append(f"  {i+1}. Performance IOI: {performance_ioi:.3f}s > Algorithm Limit: {timing_limit:.3f}s")
+                    sections.append(f"      Excess: {excess_ms:.1f}ms | Constraint: {failure['constraint_type']} | Time: {failure['time']:.3f}s")
+                    
+                    # Handle invalid timing data
+                    if tempo_ratio == 'invalid' or 'Invalid timing data' in tempo_context.get('tempo_interpretation', ''):
+                        sections.append(f"      Timing Status: {tempo_context.get('tempo_interpretation', 'Invalid timing data')}")
+                        if 'note' in tempo_context:
+                            sections.append(f"      Note: {tempo_context['note']}")
+                    elif tempo_ratio != 'unknown':
+                        sections.append(f"      Tempo Analysis: {tempo_context.get('tempo_interpretation', 'Unknown tempo relationship')}")
+                        sections.append(f"      Performance vs Expected Score IOI: {performance_ioi:.3f}s vs {tempo_context.get('expected_score_ioi', 'unknown')}s")
         
         # Match Type Analysis
         if 'match_type_analysis' not in comprehensive_context:
@@ -371,6 +401,45 @@ Focus on actionable insights that can guide algorithm improvements.
                 sections.append("- **Match type distribution**:")
                 for match_type, count in match_types.items():
                     sections.append(f"  - {match_type}: {count}")
+            
+            # Add detailed horizontal rule calculations
+            detailed_calcs = h_rule_data.get('detailed_calculations', [])
+            if detailed_calcs:
+                sections.append("\n**Detailed Horizontal Rule Calculations:**")
+                for i, calc in enumerate(detailed_calcs):
+                    pass_fail = "PASS" if calc['timing_pass'] else "FAIL"
+                    excess = f" (+{calc['excess_ms']:.1f}ms)" if calc['excess_ms'] > 0 else ""
+                    performance_ioi = calc.get('performance_ioi', calc.get('ioi', 0))
+                    timing_limit = calc.get('timing_limit', calc.get('limit', 0))
+                    
+                    sections.append(f"  {i+1}. Pitch {calc['pitch']}: Performance IOI {performance_ioi:.3f}s vs Algorithm Limit {timing_limit:.3f}s - {pass_fail}{excess}")
+                    sections.append(f"      Match Type: {calc['match_type']}, Result: {calc['result']:.2f}")
+                    
+                    # Add timing status and tempo analysis if available
+                    timing_status = calc.get('timing_status', '')
+                    if 'INVALID' in timing_status:
+                        sections.append(f"      Timing Status: {timing_status}")
+                    else:
+                        tempo_analysis = calc.get('tempo_analysis', {})
+                        if tempo_analysis and 'tempo_interpretation' in tempo_analysis:
+                            sections.append(f"      Tempo Context: {tempo_analysis['tempo_interpretation']}")
+        
+        # Vertical Rule Analysis
+        if 'vertical_rule_analysis' in comprehensive_context:
+            v_rule_data = comprehensive_context['vertical_rule_analysis']
+            if v_rule_data and v_rule_data.get('calculations'):
+                sections.append("\n### Vertical Rule Analysis")
+                calculations = v_rule_data['calculations']
+                sections.append(f"- **Total vertical rule calculations**: {len(calculations)}")
+                
+                # Add detailed vertical rule penalties
+                detailed_penalties = v_rule_data.get('detailed_penalties', [])
+                if detailed_penalties:
+                    sections.append("\n**Detailed Vertical Rule Penalties:**")
+                    for i, penalty in enumerate(detailed_penalties):
+                        sections.append(f"  {i+1}. Row {penalty['row']}: Penalty {penalty['penalty']:.2f}, Result {penalty['result']:.2f}")
+                        if penalty.get('skip_bonus', 0) != 0:
+                            sections.append(f"      Skip bonus: {penalty['skip_bonus']:.2f}")
         
         # Cell Decision Analysis  
         if 'cell_decisions' not in comprehensive_context:
@@ -395,6 +464,17 @@ Focus on actionable insights that can guide algorithm improvements.
                 sections.append("- **Decision winners**:")
                 for winner, count in winners.items():
                     sections.append(f"  - {winner}: {count}")
+            
+            # Add detailed cell decision analysis
+            detailed_decisions = decision_data.get('detailed_decisions', [])
+            if detailed_decisions:
+                sections.append("\n**Detailed Cell Decision Sequence:**")
+                for i, decision in enumerate(detailed_decisions):
+                    winner = decision['winner']
+                    margin = decision['margin']
+                    sections.append(f"  {i+1}. Row {decision['row']}: {winner.title()} won by {margin:.2f}")
+                    sections.append(f"      Vertical: {decision['vertical_value']:.2f}, Horizontal: {decision['horizontal_value']:.2f}")
+                    sections.append(f"      Reason: {decision['reason']}, Updated: {decision['updated']}")
         
         # Score Competition Analysis
         if 'score_competition' not in comprehensive_context:
@@ -417,6 +497,53 @@ Focus on actionable insights that can guide algorithm improvements.
             if confidence:
                 sections.append(f"- **Confidence range**: {min(confidence):.1f} to {max(confidence):.1f}")
             sections.append(f"- **Beats top score**: {beats_top}")
+            
+            # Add detailed score competition analysis
+            detailed_competition = score_data.get('detailed_competition', [])
+            if detailed_competition:
+                sections.append("\n**Detailed Score Competition:**")
+                for i, comp in enumerate(detailed_competition):
+                    margin_str = f"+{comp['margin']:.2f}" if comp['margin'] >= 0 else f"{comp['margin']:.2f}"
+                    beat_status = "BEATS TOP" if comp['beats_top'] else "below top"
+                    sections.append(f"  {i+1}. Row {comp['row']}: {comp['current_score']:.2f} ({margin_str}) - {beat_status}")
+                    sections.append(f"      Confidence: {comp['confidence']:.2f}")
+        
+        # Matrix State Analysis
+        if 'matrix_state' in comprehensive_context:
+            matrix_data = comprehensive_context['matrix_state']
+            window_info = matrix_data.get('window_info', {})
+            if window_info:
+                sections.append("\n### Matrix Window State")
+                sections.append(f"- **Window range**: [{window_info.get('window_start', 0)}-{window_info.get('window_end', 0)}]")
+                sections.append(f"- **Window center**: {window_info.get('window_center', 0)}")
+                sections.append(f"- **Window size**: {window_info.get('window_size', 0)}")
+                sections.append(f"- **Current base**: {window_info.get('current_base', 0)}")
+                sections.append(f"- **Previous base**: {window_info.get('prev_base', 0)}")
+        
+        # Array Neighborhood Analysis
+        if 'array_neighborhoods' in comprehensive_context:
+            array_data = comprehensive_context['array_neighborhoods']
+            neighborhoods = array_data.get('value_analysis', [])
+            if neighborhoods:
+                sections.append("\n### Array Neighborhood Analysis")
+                for i, neighborhood in enumerate(neighborhoods):
+                    sections.append(f"- **Row {neighborhood['row']}**: Center={neighborhood['center_value']:.2f}, Max={neighborhood['max_value']:.2f}")
+                    if neighborhood['neighborhood_values']:
+                        values_str = ', '.join(f"{v:.1f}" for v in neighborhood['neighborhood_values'])
+                        sections.append(f"  Values: [{values_str}]")
+        
+        # Window Movement Analysis
+        if 'window_movements' in comprehensive_context:
+            window_data = comprehensive_context['window_movements']
+            movements = window_data.get('movement_analysis', [])
+            if movements:
+                sections.append("\n### Window Movement Analysis")
+                for i, movement in enumerate(movements):
+                    old_range = f"[{movement['old_window'][0]}-{movement['old_window'][1]}]"
+                    new_range = f"[{movement['new_window'][0]}-{movement['new_window'][1]}]"
+                    sections.append(f"- **Movement {i+1}**: {old_range} → {new_range}")
+                    sections.append(f"  Size change: {movement['size_change']:+d}, Position shift: {movement['position_shift']:+d}")
+                    sections.append(f"  Reason: {movement['reason']}")
         
         # Ornament Context
         if 'ornament_context' not in comprehensive_context:
@@ -439,6 +566,20 @@ Focus on actionable insights that can guide algorithm improvements.
                 unique_types = list(set(ornament_types))
                 sections.append(f"- **Ornament types**: {', '.join(unique_types)}")
             sections.append(f"- **Credit applied**: {credit}")
+            
+            # Add detailed ornament analysis
+            detailed_ornaments = ornament_data.get('detailed_ornaments', [])
+            if detailed_ornaments:
+                sections.append("\n**Detailed Ornament Processing:**")
+                for i, ornament in enumerate(detailed_ornaments):
+                    sections.append(f"  {i+1}. Pitch {ornament['pitch']}: {ornament['ornament_type']}")
+                    sections.append(f"      Credit: {ornament['credit_applied']:.2f}")
+                    if ornament['trill_notes']:
+                        sections.append(f"      Trill notes: {ornament['trill_notes']}")
+                    if ornament['grace_notes']:
+                        sections.append(f"      Grace notes: {ornament['grace_notes']}")
+                    if ornament['ignored_notes']:
+                        sections.append(f"      Ignored notes: {ornament['ignored_notes']}")
         
         # Algorithmic Insights
         if 'algorithmic_insights' not in comprehensive_context:
