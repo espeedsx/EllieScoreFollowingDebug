@@ -5,9 +5,9 @@ You are analyzing a failure in a real-time score following algorithm that uses d
 
 ## Failure Details
 - **Failure Type**: no_match
-- **Time**: 28.307 seconds
-- **Pitch**: 67 (MIDI note number)
-- **Expected**: Match for pitch 67 at time 28.307
+- **Time**: 57.667 seconds
+- **Pitch**: 68 (MIDI note number)
+- **Expected**: Match for pitch 68 at time 57.667
 - **Actual**: No match found
 
 ## Algorithm Context
@@ -19,50 +19,50 @@ The dynamic programming algorithm uses these key components:
 - **Unused Count**: Number of expected notes not yet matched
 
 ## Decision Sequence Leading to Failure
-Decision 1: Row 83, Pitch 67, Time 28.307s
-  - Vertical rule: 241.0
-  - Horizontal rule: 241.0
-  - Final value: 241.0
+Decision 1: Row 178, Pitch 68, Time 57.667s
+  - Vertical rule: 565.0
+  - Horizontal rule: 560.0
+  - Final value: 565.0
   - Match flag: False
   - Used pitches: []
   - Unused count: 1
 
-Decision 2: Row 84, Pitch 67, Time 28.307s
-  - Vertical rule: 239.0
-  - Horizontal rule: 239.0
-  - Final value: 239.0
+Decision 2: Row 179, Pitch 68, Time 57.667s
+  - Vertical rule: 563.0
+  - Horizontal rule: 558.0
+  - Final value: 563.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 4
+
+Decision 3: Row 180, Pitch 68, Time 57.667s
+  - Vertical rule: 555.0
+  - Horizontal rule: 553.0
+  - Final value: 555.0
   - Match flag: False
   - Used pitches: []
   - Unused count: 2
 
-Decision 3: Row 85, Pitch 67, Time 28.307s
-  - Vertical rule: 235.0
-  - Horizontal rule: 235.0
-  - Final value: 235.0
+Decision 4: Row 181, Pitch 68, Time 57.667s
+  - Vertical rule: 551.0
+  - Horizontal rule: 546.0
+  - Final value: 551.0
   - Match flag: False
   - Used pitches: []
-  - Unused count: 1
+  - Unused count: 3
 
-Decision 4: Row 86, Pitch 67, Time 28.307s
-  - Vertical rule: 233.0
-  - Horizontal rule: 233.0
-  - Final value: 233.0
-  - Match flag: False
-  - Used pitches: []
-  - Unused count: 2
-
-Decision 5: Row 87, Pitch 67, Time 28.307s
-  - Vertical rule: 229.0
-  - Horizontal rule: 229.0
-  - Final value: 229.0
+Decision 5: Row 182, Pitch 68, Time 57.667s
+  - Vertical rule: 545.0
+  - Horizontal rule: -281474976710653.0
+  - Final value: 545.0
   - Match flag: False
   - Used pitches: []
   - Unused count: 1
 
 ## Score Progression
 The algorithm's confidence scores leading to the failure:
-241.0 -> 239.0 -> 235.0 -> 233.0 -> 229.0
-Trend: decreasing (from 241.0 to 229.0)
+565.0 -> 563.0 -> 555.0 -> 551.0 -> 545.0
+Trend: decreasing (from 565.0 to 545.0)
 
 ## Timing Analysis
 - Decision span: 0.000 seconds
@@ -71,9 +71,9 @@ Trend: decreasing (from 241.0 to 229.0)
 - Time to failure: 0.000s
 
 ## Preceding Successful Matches
-Match 1: Pitch 71 at 28.194s, Score 248.0
-Match 2: Pitch 62 at 28.212s, Score 250.0
-Match 3: Pitch 67 at 28.212s, Score 252.0
+Match 1: Pitch 64 at 57.077s, Score 573.0
+Match 2: Pitch 48 at 57.079s, Score 575.0
+Match 3: Pitch 66 at 57.402s, Score 577.0
 
 ## Your Task
 Analyze this failure and provide insights on:

@@ -327,24 +327,33 @@ class FailureAnalyzer:
         test_info = self.metadata.get('test_info')
         return test_info.get('test_case', 0) if test_info else 0
     
-    def get_most_critical_failure(self) -> Optional[FailureContext]:
+    def get_most_critical_failure(self, after_score_time: Optional[float] = None) -> Optional[FailureContext]:
         """Get the most critical failure for focused AI analysis."""
         report = self.analyze()
         
         if not report.failure_contexts:
             return None
         
+        # Filter by score time if specified
+        candidate_failures = report.failure_contexts
+        if after_score_time is not None:
+            candidate_failures = [fc for fc in report.failure_contexts if fc.failure_time >= after_score_time]
+            if not candidate_failures:
+                logger.info(f"No failures found after score time {after_score_time:.3f}s")
+                return None
+            logger.info(f"Filtering to {len(candidate_failures)} failures after score time {after_score_time:.3f}s")
+        
         # Focus primarily on no_match failures (unmatched notes)
         priority_order = ['no_match', 'wrong_match', 'score_drop']
         
         for failure_type in priority_order:
-            failures_of_type = [fc for fc in report.failure_contexts if fc.failure_type == failure_type]
+            failures_of_type = [fc for fc in candidate_failures if fc.failure_type == failure_type]
             if failures_of_type:
                 # Return the first one (earliest in time)
                 return min(failures_of_type, key=lambda fc: fc.failure_time)
         
         # Fallback to first failure
-        return report.failure_contexts[0]
+        return candidate_failures[0] if candidate_failures else None
 
 
 def analyze_log_file(log_file_or_analysis: Path) -> FailureReport:

@@ -335,13 +335,14 @@ Focus on actionable insights that can guide algorithm improvements.
         return output_file
 
 
-def analyze_with_ai_prompt(input_file: Path, focused: bool = True) -> Tuple[str, Optional[FailureContext]]:
+def analyze_with_ai_prompt(input_file: Path, focused: bool = True, score_time: Optional[float] = None) -> Tuple[str, Optional[FailureContext]]:
     """
     Generate AI analysis prompt from log or failure report.
     
     Args:
         input_file: Path to log file or failure report
         focused: Whether to focus on most critical failure or do general analysis
+        score_time: Focus on first failure after this score time (seconds)
         
     Returns:
         Tuple of (prompt_text, focus_context)
@@ -363,22 +364,35 @@ def analyze_with_ai_prompt(input_file: Path, focused: bool = True) -> Tuple[str,
     # Determine focus context
     focus_context = None
     if focused and report.failure_contexts:
+        # Filter by score time if specified
+        candidate_failures = report.failure_contexts
+        if score_time is not None:
+            candidate_failures = [fc for fc in report.failure_contexts if fc.failure_time >= score_time]
+            if not candidate_failures:
+                logger.info(f"No failures found after score time {score_time:.3f}s")
+                return "", None
+            logger.info(f"Filtering to {len(candidate_failures)} failures after score time {score_time:.3f}s")
+        
         # Get most critical failure (prioritize no_match failures)
         priority_order = ['no_match', 'wrong_match', 'score_drop']
         
         for failure_type in priority_order:
-            failures_of_type = [fc for fc in report.failure_contexts if fc.failure_type == failure_type]
+            failures_of_type = [fc for fc in candidate_failures if fc.failure_type == failure_type]
             if failures_of_type:
                 # Return the first one (earliest in time)
                 focus_context = min(failures_of_type, key=lambda fc: fc.failure_time)
                 break
         
         if focus_context:
-            logger.info(f"Focusing on {focus_context.failure_type} at {focus_context.failure_time:.3f}s")
+            if score_time is not None:
+                logger.info(f"Focusing on {focus_context.failure_type} at {focus_context.failure_time:.3f}s (after score time {score_time:.3f}s)")
+            else:
+                logger.info(f"Focusing on {focus_context.failure_type} at {focus_context.failure_time:.3f}s")
         else:
             # Fallback to earliest failure
-            focus_context = min(report.failure_contexts, key=lambda fc: fc.failure_time)
-            logger.info(f"Fallback: focusing on {focus_context.failure_type} at {focus_context.failure_time:.3f}s")
+            focus_context = min(candidate_failures, key=lambda fc: fc.failure_time) if candidate_failures else None
+            if focus_context:
+                logger.info(f"Fallback: focusing on {focus_context.failure_type} at {focus_context.failure_time:.3f}s")
     
     # Generate prompt
     prompt = analyzer.generate_analysis_prompt(focus_context)
@@ -391,6 +405,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate AI analysis for score following failures")
     parser.add_argument("input_file", type=Path, help="Log file or failure report JSON")
     parser.add_argument("--general", action="store_true", help="Generate general analysis instead of focused")
+    parser.add_argument("--score-time", type=float, help="Focus on first failure after this score time (seconds)")
     parser.add_argument("--output", "-o", type=Path, help="Output file for AI prompt")
     parser.add_argument("--insights", type=Path, help="File containing AI insights to incorporate")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
@@ -404,7 +419,7 @@ def main():
     try:
         # Generate prompt
         focused = not args.general
-        prompt, focus_context = analyze_with_ai_prompt(args.input_file, focused=focused)
+        prompt, focus_context = analyze_with_ai_prompt(args.input_file, focused=focused, score_time=args.score_time)
         
         # Save prompt if output specified
         if args.output:

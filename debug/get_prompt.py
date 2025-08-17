@@ -12,6 +12,7 @@ from utils import find_latest_log
 def main():
     parser = argparse.ArgumentParser(description="Generate AI prompt and save to prompt.txt")
     parser.add_argument("test_case", type=int, nargs='?', default=1, help="Test case ID (default: 1)")
+    parser.add_argument("--score-time", type=float, help="Focus on first failure after this score time (seconds)")
     parser.add_argument("--output", "-o", type=Path, default="prompt.txt", help="Output file (default: prompt.txt)")
     
     args = parser.parse_args()
@@ -27,7 +28,7 @@ def main():
     
     # Generate prompt
     try:
-        prompt, focus_context = analyze_with_ai_prompt(log_file, focused=True)
+        prompt, focus_context = analyze_with_ai_prompt(log_file, focused=True, score_time=args.score_time)
         
         # Save to file
         args.output.write_text(prompt, encoding='utf-8')

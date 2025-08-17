@@ -9,6 +9,13 @@ python debug_workflow.py 1
 ```
 *Runs test case 1, analyzes failures, displays AI prompt ready to copy to Claude*
 
+### Focus on Specific Time Range
+```bash
+cd debug
+python debug_workflow.py 1 --score-time 20.5
+```
+*Focus on first mismatch after 20.5 seconds of score time*
+
 ### Manual Step-by-Step
 ```bash
 # 1. Run test with debug logging
@@ -63,8 +70,10 @@ DP|c:5|r:12|p:60|t:2.34|vr:8.0|hr:9.0|f:9.0|m:1|u:[60,64]|uc:1
 | `failure_analyzer.py` | `--verbose` | Detailed failure analysis |
 | `ai_analyzer.py` | `--general` | Analyze all failures |
 | | `--focused` | Focus on critical failure (prioritizes no_match) |
+| | `--score-time N.N` | Focus on failures after score time |
 | | `--insights file.txt` | Include AI insights |
 | `debug_workflow.py` | `--skip-execution` | Use existing log |
+| | `--score-time N.N` | Focus on failures after score time |
 | | `--ai-insights file.txt` | Include AI response |
 | | `--verbose` | Detailed output |
 
@@ -89,10 +98,10 @@ DP|c:5|r:12|p:60|t:2.34|vr:8.0|hr:9.0|f:9.0|m:1|u:[60,64]|uc:1
 ### Manual Prompt Generation
 ```bash
 # Generate and save prompt to prompt.txt (easiest)
-python get_prompt.py 1
+python get_prompt.py 1 --score-time 25.0
 
 # Or output directly to console  
-python ai_analyzer.py logs/test_1_*.log
+python ai_analyzer.py logs/test_1_*.log --score-time 25.0
 ```
 
 ### Where is the AI Prompt?

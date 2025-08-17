@@ -29,13 +29,14 @@ class DebugWorkflow:
         self.timestamp = get_timestamp()
         self.results = {}
         
-    def run_complete_analysis(self, skip_execution: bool = False, ai_insights: Optional[str] = None) -> Dict[str, Any]:
+    def run_complete_analysis(self, skip_execution: bool = False, ai_insights: Optional[str] = None, score_time: Optional[float] = None) -> Dict[str, Any]:
         """
         Run the complete debug analysis workflow.
         
         Args:
             skip_execution: Skip test execution and use existing log
             ai_insights: Pre-generated AI insights to include in report
+            score_time: Focus on first failure after this score time (seconds)
             
         Returns:
             Complete workflow results
@@ -60,7 +61,7 @@ class DebugWorkflow:
             failure_report = self._analyze_failures(parsed_data)
             
             # Step 4: Generate AI analysis
-            ai_report = self._generate_ai_analysis(failure_report, ai_insights, parsed_data)
+            ai_report = self._generate_ai_analysis(failure_report, ai_insights, parsed_data, score_time)
             
             # Step 5: Create summary
             summary = self._create_summary()
@@ -145,21 +146,33 @@ class DebugWorkflow:
         logger.info(f"Found {failure_report.total_failures} failures")
         return failure_report
     
-    def _generate_ai_analysis(self, failure_report: Dict[str, Any], ai_insights: Optional[str] = None, parsed_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _generate_ai_analysis(self, failure_report: Dict[str, Any], ai_insights: Optional[str] = None, parsed_data: Optional[Dict[str, Any]] = None, score_time: Optional[float] = None) -> Dict[str, Any]:
         """Generate AI analysis prompt and report."""
-        logger.info("Step 4: Generating AI analysis")
+        if score_time is not None:
+            logger.info(f"Step 4: Generating AI analysis (focusing after score time {score_time:.3f}s)")
+        else:
+            logger.info("Step 4: Generating AI analysis")
         
         analyzer = AIAnalyzer(failure_report)
         
         # Get most critical failure for focused analysis (prioritize no_match failures)
         if parsed_data:
             analyzer_instance = FailureAnalyzer(parsed_data)
-            focus_context = analyzer_instance.get_most_critical_failure()
+            focus_context = analyzer_instance.get_most_critical_failure(score_time)
         else:
             # Fallback to earliest failure if no parsed data available
             focus_context = None
             if failure_report.failure_contexts:
-                focus_context = min(failure_report.failure_contexts, key=lambda fc: fc.failure_time)
+                candidate_failures = failure_report.failure_contexts
+                if score_time is not None:
+                    candidate_failures = [fc for fc in failure_report.failure_contexts if fc.failure_time >= score_time]
+                    if not candidate_failures:
+                        logger.info(f"No failures found after score time {score_time:.3f}s")
+                    else:
+                        logger.info(f"Filtering to {len(candidate_failures)} failures after score time {score_time:.3f}s")
+                
+                if candidate_failures:
+                    focus_context = min(candidate_failures, key=lambda fc: fc.failure_time)
         
         # Generate prompt
         prompt = analyzer.generate_analysis_prompt(focus_context)
@@ -242,7 +255,8 @@ def run_workflow(test_case_id: int, **kwargs) -> Dict[str, Any]:
     workflow = DebugWorkflow(test_case_id, kwargs.get('enable_debug', True))
     return workflow.run_complete_analysis(
         skip_execution=kwargs.get('skip_execution', False),
-        ai_insights=kwargs.get('ai_insights')
+        ai_insights=kwargs.get('ai_insights'),
+        score_time=kwargs.get('score_time')
     )
 
 
@@ -253,6 +267,7 @@ def main():
     parser.add_argument("--skip-execution", action="store_true", help="Skip test execution, use existing log")
     parser.add_argument("--no-debug", action="store_true", help="Disable debug logging during execution")
     parser.add_argument("--ai-insights", type=Path, help="File containing AI insights to include")
+    parser.add_argument("--score-time", type=float, help="Focus on first mismatch after this score time (seconds)")
     parser.add_argument("--output", "-o", type=Path, help="Output file for workflow results")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     
@@ -274,7 +289,8 @@ def main():
             args.test_case,
             skip_execution=args.skip_execution,
             enable_debug=not args.no_debug,
-            ai_insights=ai_insights
+            ai_insights=ai_insights,
+            score_time=args.score_time
         )
         
         # Save results if output specified
