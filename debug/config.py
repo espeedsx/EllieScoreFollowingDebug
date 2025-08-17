@@ -62,7 +62,7 @@ LOG_PATTERNS = {
     "timing_check": r"TIMING\|pt:([-\d.]+)\|ct:([-\d.]+)\|ioi:([-\d.]+)\|span:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|type:(\w+)",
     "match_type": r"MATCH_TYPE\|pit:(\d+)\|ch:(\w+)\|tr:(\w+)\|gr:(\w+)\|ex:(\w+)\|ign:(\w+)\|used:(\w+)\|time:(\w+)\|orn:(\w+)",
     "cell_decision": r"DECISION\|r:(\d+)\|vr:([-\d.]+)\|hr:([-\d.]+)\|win:(\w+)\|upd:(\w+)\|val:([-\d.]+)\|reason:(\w+)",
-    "array_neighborhood": r"ARRAY\|r:(\d+)\|center:([-\d.]+)\|vals:\[([-\d.,]+)\]\|pos:([\d,]+)",
+    "array_neighborhood": r"ARRAY\|r:(\d+)\|center:([-\d.]+)\|vals:\[([-\d.,\s]+)\]\|pos:\[([-\d,\s]+)\]",
     "score_competition": r"SCORE\|r:(\d+)\|cur:([-\d.]+)\|top:([-\d.]+)\|beat:(\w+)\|margin:([-\d.]+)\|conf:([-\d.]+)",
     "ornament_processing": r"ORNAMENT\|pit:(\d+)\|type:(\w+)\|tr:\[([\d,]*)\]\|gr:\[([\d,]*)\]\|ig:\[([\d,]*)\]\|credit:([-\d.]+)",
     "window_movement": r"WINDOW_MOVE\|oc:(\d+)\|nc:(\d+)\|os:(\d+)\|ns:(\d+)\|oe:(\d+)\|ne:(\d+)\|reason:(\w+)"

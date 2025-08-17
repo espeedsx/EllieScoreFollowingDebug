@@ -1,0 +1,74 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Workflow 743",
+            "type": "python",
+            "request": "launch",
+            "program": "debug\\debug_workflow.py",
+            "args": [
+                "743",
+                "--score-time",
+                "187.5"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}\\debug"
+            }
+        },
+        {
+            "name": "Debug Workflow - General",
+            "type": "python",
+            "request": "launch",
+            "program": "debug\\debug_workflow.py",
+            "args": [
+                "${input:testCaseId}",
+                "--score-time",
+                "${input:scoreTime}"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}\\debug"
+            }
+        },
+        {
+            "name": "Debug Workflow - Skip Execution",
+            "type": "python",
+            "request": "launch",
+            "program": "debug\\debug_workflow.py",
+            "args": [
+                "${input:testCaseId}",
+                "--skip-execution",
+                "--score-time",
+                "${input:scoreTime}"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}\\debug"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "testCaseId",
+            "description": "Test case ID",
+            "default": "743",
+            "type": "promptString"
+        },
+        {
+            "id": "scoreTime",
+            "description": "Score time to focus on",
+            "default": "187.5",
+            "type": "promptString"
+        }
+    ]
+}
