@@ -7,7 +7,7 @@
 cd debug
 python debug_workflow.py 1
 ```
-*Runs test case 1, analyzes failures, generates AI prompt*
+*Runs test case 1, analyzes failures, displays AI prompt ready to copy to Claude*
 
 ### Manual Step-by-Step
 ```bash
@@ -32,7 +32,7 @@ python ai_analyzer.py logs/test_1_*.log --insights insights.txt
 |--------------|-------------|
 | `logs/test_N_*.log` | Debug log with DP decisions |
 | `analysis/analysis_N_*.json` | Parsed log data |
-| `reports/report_N_*.json` | Complete analysis with AI insights |
+| `reports/report_N_*.md` | Complete analysis with AI insights |
 
 ## 🔍 Debug Log Format
 
@@ -58,11 +58,11 @@ DP|c:5|r:12|p:60|t:2.34|vr:8.0|hr:9.0|f:9.0|m:1|u:[60,64]|uc:1
 | Command | Options | Purpose |
 |---------|---------|---------|
 | `run_debug_test.py` | `--verbose` | Detailed execution output |
-| | `--timeout 15` | Custom timeout (default 10s) |
+| | `--timeout 15` | Custom timeout (default 5s) |
 | | `--no-debug` | Disable debug logging |
 | `failure_analyzer.py` | `--verbose` | Detailed failure analysis |
 | `ai_analyzer.py` | `--general` | Analyze all failures |
-| | `--focused` | Focus on critical failure |
+| | `--focused` | Focus on critical failure (prioritizes no_match) |
 | | `--insights file.txt` | Include AI insights |
 | `debug_workflow.py` | `--skip-execution` | Use existing log |
 | | `--ai-insights file.txt` | Include AI response |
@@ -70,20 +70,35 @@ DP|c:5|r:12|p:60|t:2.34|vr:8.0|hr:9.0|f:9.0|m:1|u:[60,64]|uc:1
 
 ## 🧠 AI Analysis Workflow
 
-1. **Generate Prompt**
+1. **Run Complete Analysis**
    ```bash
-   python ai_analyzer.py logs/test_1_*.log > prompt.txt
+   python debug_workflow.py 1
    ```
+   *Displays AI prompt ready to copy*
 
 2. **Send to Claude**
-   - Copy `prompt.txt` content
+   - Copy prompt from console output (between the === lines)
    - Paste into Claude conversation
    - Save response as `insights.txt`
 
-3. **Complete Analysis**
+3. **Complete Analysis with Insights**
    ```bash
-   python ai_analyzer.py logs/test_1_*.log --insights insights.txt
+   python debug_workflow.py 1 --ai-insights insights.txt --skip-execution
    ```
+
+### Manual Prompt Generation
+```bash
+# Generate and save prompt to prompt.txt (easiest)
+python get_prompt.py 1
+
+# Or output directly to console  
+python ai_analyzer.py logs/test_1_*.log
+```
+
+### Where is the AI Prompt?
+- **Console output**: When running `debug_workflow.py` or `ai_analyzer.py`
+- **Saved file**: Run `python get_prompt.py 1` → creates `prompt.txt`
+- **In reports**: Stored in `reports/report_N_*.md` files
 
 ## 🚨 Troubleshooting
 
@@ -97,11 +112,11 @@ DP|c:5|r:12|p:60|t:2.34|vr:8.0|hr:9.0|f:9.0|m:1|u:[60,64]|uc:1
 
 ## 📊 Failure Types
 
-| Type | Description | Common Causes |
-|------|-------------|---------------|
-| `no_match` | Note not matched to score | Timing constraints too strict |
-| `wrong_match` | Match with low confidence | Wrong pitch/timing alignment |
-| `score_drop` | Algorithm confidence falls | Parameter mismatch |
+| Type | Description | Common Causes | Priority |
+|------|-------------|---------------|-----------|
+| `no_match` | Note not matched to score | Timing constraints too strict | **High** |
+| `wrong_match` | Match with low confidence | Wrong pitch/timing alignment | Medium |
+| `score_drop` | Algorithm confidence falls | Parameter mismatch | Low |
 
 ## ⚡ Quick Checks
 
@@ -153,10 +168,11 @@ python debug_workflow.py 1 --skip-execution
 
 ## 📝 AI Prompt Tips
 
-- **Focus on one failure** - Use `--focused` for specific issues
+- **Focus on one failure** - Default behavior prioritizes unmatched notes (no_match)
 - **Include context** - Mention musical style, difficulty
 - **Ask specific questions** - Parameter values, timing constraints
 - **Request actionable fixes** - Code changes, parameter adjustments
+- **Copy from console** - Full prompt displayed after running debug_workflow.py
 
 ## 🔄 Iterative Debugging
 

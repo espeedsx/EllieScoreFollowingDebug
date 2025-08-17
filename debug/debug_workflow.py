@@ -184,7 +184,8 @@ class DebugWorkflow:
             'focus_context': focus_context.failure_type if focus_context else None,
             'insights_provided': ai_insights is not None,
             'report_file': str(report_file) if report_file else None,
-            'prompt_preview': prompt[:200] + "..." if len(prompt) > 200 else prompt
+            'prompt_preview': prompt[:200] + "..." if len(prompt) > 200 else prompt,
+            'prompt': prompt  # Store full prompt for display
         }
         
         return {
@@ -314,12 +315,22 @@ def main():
                 else:
                     print("  - Ready for AI analysis")
             
-            # Show next steps
+            # Show AI prompt directly if no insights provided
             if not summary.get('ai_insights_included') and summary.get('total_failures', 0) > 0:
-                print(f"\nNext Steps:")
-                print(f"1. Copy the AI analysis prompt to Claude")
-                print(f"2. Get AI insights and save to file")
-                print(f"3. Re-run with --ai-insights <file> to complete analysis")
+                ai_result = results['results'].get('ai_analysis', {})
+                if 'prompt' in ai_result:
+                    print(f"\n" + "="*80)
+                    print(f"AI ANALYSIS PROMPT - COPY TO CLAUDE")
+                    print(f"="*80)
+                    print(ai_result['prompt'])
+                    print(f"="*80)
+                    print(f"END OF PROMPT")
+                    print(f"="*80)
+                    
+                    print(f"\nNext Steps:")
+                    print(f"1. Copy the prompt above to Claude")
+                    print(f"2. Save Claude's response as insights.txt")
+                    print(f"3. Re-run with --ai-insights insights.txt --skip-execution")
         else:
             print(f"Error: {metadata.get('error', 'Unknown error')}")
             return 1

@@ -1,0 +1,93 @@
+# Score Following Algorithm Failure Analysis
+
+## Context
+You are analyzing a failure in a real-time score following algorithm that uses dynamic programming to match musical performance notes against a musical score. The algorithm maintains a matrix where rows represent score events and columns represent performance events.
+
+## Failure Details
+- **Failure Type**: no_match
+- **Time**: 28.307 seconds
+- **Pitch**: 67 (MIDI note number)
+- **Expected**: Match for pitch 67 at time 28.307
+- **Actual**: No match found
+
+## Algorithm Context
+The dynamic programming algorithm uses these key components:
+- **Vertical Rule**: Advance in score without matching (penalty for missing notes)
+- **Horizontal Rule**: Match performance note to score note (credit for matches)
+- **Final Value**: Maximum of vertical and horizontal rule values
+- **Used Pitches**: Notes already matched in current chord
+- **Unused Count**: Number of expected notes not yet matched
+
+## Decision Sequence Leading to Failure
+Decision 1: Row 83, Pitch 67, Time 28.307s
+  - Vertical rule: 241.0
+  - Horizontal rule: 241.0
+  - Final value: 241.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 2: Row 84, Pitch 67, Time 28.307s
+  - Vertical rule: 239.0
+  - Horizontal rule: 239.0
+  - Final value: 239.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 2
+
+Decision 3: Row 85, Pitch 67, Time 28.307s
+  - Vertical rule: 235.0
+  - Horizontal rule: 235.0
+  - Final value: 235.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 4: Row 86, Pitch 67, Time 28.307s
+  - Vertical rule: 233.0
+  - Horizontal rule: 233.0
+  - Final value: 233.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 2
+
+Decision 5: Row 87, Pitch 67, Time 28.307s
+  - Vertical rule: 229.0
+  - Horizontal rule: 229.0
+  - Final value: 229.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+## Score Progression
+The algorithm's confidence scores leading to the failure:
+241.0 -> 239.0 -> 235.0 -> 233.0 -> 229.0
+Trend: decreasing (from 241.0 to 229.0)
+
+## Timing Analysis
+- Decision span: 0.000 seconds
+- Average inter-onset interval: 0.000s
+- Maximum gap: 0.000s
+- Time to failure: 0.000s
+
+## Preceding Successful Matches
+Match 1: Pitch 71 at 28.194s, Score 248.0
+Match 2: Pitch 62 at 28.212s, Score 250.0
+Match 3: Pitch 67 at 28.212s, Score 252.0
+
+## Your Task
+Analyze this failure and provide insights on:
+
+1. **Root Cause**: What specific algorithm decision or parameter likely caused this failure?
+
+2. **Decision Tree Analysis**: How did the sequence of decisions lead to the wrong outcome?
+
+3. **Parameter Issues**: Which algorithm parameters (timing windows, scoring weights, penalties) might need adjustment?
+
+4. **Timing Constraints**: Are the timing constraints too strict or too loose for this scenario?
+
+5. **Alternative Strategies**: What alternative algorithmic approaches might handle this case better?
+
+6. **Fix Recommendations**: Specific, actionable changes to prevent this type of failure.
+
+Please be specific and reference the exact decision points and values shown in the context.
