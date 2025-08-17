@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(rm:*)",
-      "Bash(del \"C:\\Repos\\EllieScoreFollowing\\src\\score_follower.srp\")"
+      "Bash(del \"C:\\Repos\\EllieScoreFollowing\\src\\score_follower.srp\")",
+      "Bash(mkdir:*)",
+      "Bash(python run_debug_test.py:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

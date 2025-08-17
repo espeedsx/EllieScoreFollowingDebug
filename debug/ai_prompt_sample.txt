@@ -1,0 +1,108 @@
+# Score Following Algorithm Failure Analysis
+
+## Context
+You are analyzing a failure in a real-time score following algorithm that uses dynamic programming to match musical performance notes against a musical score. The algorithm maintains a matrix where rows represent score events and columns represent performance events.
+
+## Failure Details
+- **Failure Type**: score_drop
+- **Time**: 4.924 seconds
+- **Pitch**: 62 (MIDI note number)
+- **Expected**: Maintain score around 6.0
+- **Actual**: Score dropped to 2.0
+
+## Algorithm Context
+The dynamic programming algorithm uses these key components:
+- **Vertical Rule**: Advance in score without matching (penalty for missing notes)
+- **Horizontal Rule**: Match performance note to score note (credit for matches)
+- **Final Value**: Maximum of vertical and horizontal rule values
+- **Used Pitches**: Notes already matched in current chord
+- **Unused Count**: Number of expected notes not yet matched
+
+## Decision Sequence Leading to Failure
+Decision 1: Row 12, Pitch 62, Time 4.924s
+  - Vertical rule: 14.0
+  - Horizontal rule: 9.0
+  - Final value: 14.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 2: Row 13, Pitch 62, Time 4.924s
+  - Vertical rule: 12.0
+  - Horizontal rule: 7.0
+  - Final value: 12.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 3: Row 14, Pitch 62, Time 4.924s
+  - Vertical rule: 10.0
+  - Horizontal rule: 5.0
+  - Final value: 10.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 4: Row 15, Pitch 62, Time 4.924s
+  - Vertical rule: 8.0
+  - Horizontal rule: 3.0
+  - Final value: 8.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+Decision 5: Row 16, Pitch 62, Time 4.924s
+  - Vertical rule: 6.0
+  - Horizontal rule: 1.0
+  - Final value: 6.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 2
+
+Decision 6: Row 17, Pitch 62, Time 4.924s
+  - Vertical rule: 2.0
+  - Horizontal rule: -281474976710653.0
+  - Final value: 2.0
+  - Match flag: False
+  - Used pitches: []
+  - Unused count: 1
+
+## Score Progression
+The algorithm's confidence scores leading to the failure:
+14.0 -> 12.0 -> 10.0 -> 8.0 -> 6.0 -> 2.0
+Trend: decreasing (from 14.0 to 2.0)
+
+## Timing Analysis
+- Decision span: 0.000 seconds
+- Average inter-onset interval: 0.000s
+- Maximum gap: 0.000s
+- Time to failure: 0.000s
+
+## Preceding Successful Matches
+Match 1: Pitch 65 at 3.527s, Score 12.0
+Match 2: Pitch 64 at 3.663s, Score 14.0
+Match 3: Pitch 69 at 4.289s, Score 16.0
+
+## Your Task
+Analyze this failure and provide insights on:
+
+1. **Root Cause**: What specific algorithm decision or parameter likely caused this failure?
+
+2. **Decision Tree Analysis**: How did the sequence of decisions lead to the wrong outcome?
+
+3. **Parameter Issues**: Which algorithm parameters (timing windows, scoring weights, penalties) might need adjustment?
+
+4. **Timing Constraints**: Are the timing constraints too strict or too loose for this scenario?
+
+5. **Alternative Strategies**: What alternative algorithmic approaches might handle this case better?
+
+6. **Fix Recommendations**: Specific, actionable changes to prevent this type of failure.
+
+Please be specific and reference the exact decision points and values shown in the context.
+
+
+AI Analysis Prompt Summary:
+Input: logs\test_1_20250816_170633.log
+Type: Focused
+Focus: score_drop at 4.924s
+Prompt length: 3261 characters

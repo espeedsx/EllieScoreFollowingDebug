@@ -183,3 +183,6 @@ large_gap_labels.txt
 srp.log
 matrix.txt
 
+debug/analysis/
+debug/reports/
+

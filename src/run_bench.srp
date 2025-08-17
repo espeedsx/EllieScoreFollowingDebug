@@ -8,6 +8,7 @@ LOG_ROGER = false
 LOG1 = false
 LOG2 = false
 LOG3 = false
+LOG_DEBUG = false
 TOPX = 50
 NOHINTS_MODE = false
 
@@ -177,6 +178,7 @@ def help():
     print "   -1 --LOG1: set LOG1 to true (prints debugging information)"
     print "   -2 --LOG2: sets LOG1 and LOG2 to true (prints debugging"
     print "           information)"
+    print "   -d --LOG_DEBUG: enable compact debug logging for AI analysis"
     print "   -m --matrix <time> <window>: prints the match matrix starting"
     print "           <window> (an integer) events before <time> (a score"
     print "           time in seconds) and ending <window> events after."
@@ -213,6 +215,7 @@ def main_start():
     FIND_TRILLS = cmdline.get_option(["-t", "--trill"])
     LOG2 = cmdline.get_option(["-2", "--LOG2"])
     LOG1 = LOG2 or cmdline.get_option(["-1", "--LOG1"])
+    LOG_DEBUG = cmdline.get_option(["-d", "--LOG_DEBUG"])
     LIST_MODE = cmdline.get_option(["-l", "--list"])
     NOHINTS_MODE = cmdline.get_option(["-n", "--nohints"])
     var matrix_option = cmdline.get_named(["-m", "--matrix"], n = 2, [nil, nil])
@@ -226,6 +229,8 @@ def main_start():
         print "LOG1 enabled"
     if LOG2:
         print "LOG2 enabled"
+    if LOG_DEBUG:
+        print "LOG_DEBUG enabled"
     if NOHINTS_MODE:
         print "NOHINTS_MODE enabled: Hints from labels files will be ignored."
     var p1 = cmdline.get_posn(1, 'prompt', "start index or midi score")

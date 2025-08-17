@@ -10,6 +10,7 @@ This repository implements score following algorithms for musical performance ev
 - Benchmarking infrastructure using the ASAP dataset
 - Multiple algorithm versions and strategies
 - Comprehensive evaluation and analysis tools
+- **🆕 AI-Powered Debugging System** - Systematic failure analysis with AI insights
 
 ## Repository Structure
 
@@ -29,6 +30,12 @@ This repository implements score following algorithms for musical performance ev
 ├── tests/                        # Test data and results
 ├── sfhints/                      # Hint/label files by composer
 ├── EllieTrillReview/            # Trill analysis tools (Python)
+├── debug/                        # 🆕 AI-powered debugging system
+│   ├── debug.py                  # Simple launcher
+│   ├── debug_workflow.py         # Complete analysis pipeline
+│   ├── AI_USAGE_GUIDE.md         # How to use AI debugger
+│   ├── QUICK_REFERENCE.md        # Command reference
+│   └── EXAMPLE_WORKFLOW.md       # Step-by-step example
 └── doc/                         # Documentation
 ```
 
@@ -578,6 +585,125 @@ This implementation is based on the foundational work:
 - Extended with modern trill handling techniques
 - Evaluated against comprehensive classical music dataset
 - Designed for real-time interactive music systems
+
+---
+
+# 🧠 AI-Powered Debugging System
+
+## Overview
+
+The `debug/` directory contains a comprehensive AI-assisted debugging system that instruments the score following algorithm to capture detailed decision logs and uses AI to analyze failures systematically.
+
+## Key Features
+
+- **Compact Logging**: Captures every dynamic programming decision in storage-efficient format
+- **Failure Detection**: Automatically identifies no-matches, wrong matches, and score drops
+- **Context Extraction**: Gets decision sequences leading to failures for analysis
+- **AI Analysis**: Generates focused prompts for AI-powered root cause analysis
+- **Cost Optimized**: Selective analysis minimizes AI token usage
+
+## Quick Start
+
+```bash
+# Complete AI-powered analysis of test case 1
+cd debug
+python debug.py 1
+
+# Follow the AI analysis workflow:
+# 1. Copy generated prompt to Claude AI
+# 2. Save AI response as insights.txt  
+# 3. Complete analysis: python debug.py 1 --ai insights.txt
+```
+
+## System Components
+
+### Core Tools
+- `debug.py` - Simple launcher with unified interface
+- `debug_workflow.py` - Complete analysis pipeline orchestrator
+- `run_debug_test.py` - Test execution with timeout and logging
+- `log_parser.py` - Parse compact debug logs into structured data
+- `failure_analyzer.py` - Detect failures and extract context
+- `ai_analyzer.py` - Generate AI prompts and integrate insights
+
+### Documentation
+- `AI_USAGE_GUIDE.md` - Complete guide to using the AI debugger
+- `QUICK_REFERENCE.md` - Command reference and troubleshooting
+- `EXAMPLE_WORKFLOW.md` - Step-by-step walkthrough with examples
+- `README.md` - Technical implementation details
+
+## Debug Log Format
+
+The system uses a compact format optimized for AI analysis:
+
+```
+DP|c:N|r:R|p:P|t:T|vr:VR|hr:HR|f:F|m:M|u:[P1,P2]|uc:U
+```
+
+Where:
+- `c:N` = column (performance note number)
+- `r:R` = row (score event number)
+- `p:P` = pitch (MIDI note number)
+- `t:T` = time (seconds)
+- `vr:VR` = vertical rule value
+- `hr:HR` = horizontal rule value  
+- `f:F` = final cell value
+- `m:M` = match flag (1/0)
+- `u:[P1,P2]` = used pitches list
+- `uc:U` = unused count
+
+## Workflow Process
+
+1. **Instrument & Capture**: Run test with `-d` flag to log DP decisions
+2. **Parse & Analyze**: Convert logs to structured data and identify failures
+3. **AI Analysis**: Generate focused prompts for specific failure contexts
+4. **Get Insights**: Send prompts to Claude AI for root cause analysis
+5. **Implement Fixes**: Apply AI recommendations and validate improvements
+
+## Usage Examples
+
+### Basic Debugging
+```bash
+python debug.py 1                    # Debug test case 1
+python debug.py 1 --quick           # Use existing log if available
+python debug.py 1 --ai insights.txt # Include AI insights
+```
+
+### Manual Control
+```bash
+python run_debug_test.py 1          # Just run test with logging
+python failure_analyzer.py logs/test_1_*.log  # Analyze failures
+python ai_analyzer.py logs/test_1_*.log > prompt.txt  # Generate AI prompt
+```
+
+### Comparison Analysis
+```bash
+# Before algorithm changes
+python debug.py 1 --output before.json
+
+# After changes  
+python debug.py 1 --output after.json
+
+# Compare results
+grep "total_failures" before.json after.json
+```
+
+## AI Analysis Benefits
+
+- **Systematic**: Data-driven rather than trial-and-error debugging
+- **Focused**: Analyzes specific failure contexts, not entire logs
+- **Cost-Efficient**: Compact format minimizes AI token usage
+- **Actionable**: Provides specific parameter adjustments and code changes
+- **Iterative**: Enables continuous improvement through AI feedback
+
+## Integration with Main System
+
+The debug system is designed to be:
+- **Non-Invasive**: Zero impact when LOG_DEBUG is disabled
+- **Modular**: Each component can be used independently
+- **Storage-Efficient**: Compact logging optimized for analysis
+- **AI-Optimized**: Structured data format designed for LLM consumption
+
+See the documentation files in `debug/` for complete usage instructions and examples.
 
 ---
 

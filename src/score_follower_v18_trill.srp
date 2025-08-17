@@ -25,6 +25,46 @@ VERSION = "v18tr"
 
 SFDBG = nil
 
+// Debug file for compact logging
+DEBUG_FILE = nil
+input_count = 0  // track performance note number for debug logging
+
+def debug_log(message):
+    if LOG_DEBUG and DEBUG_FILE:
+        DEBUG_FILE.write(message + "\n")
+        DEBUG_FILE.flush()
+
+def format_pitches_compact(pitches):
+    // Format pitch list for compact logging
+    if len(pitches) == 0:
+        return ""
+    var result = str(pitches[0])
+    for i = 1 to len(pitches):
+        result = result + "," + str(pitches[i])
+    return result
+
+def log_dp_decision(col, row, pitch, time, vert_rule, horiz_rule, final_val, match_flag, used_pitches, unused_count):
+    // Log a dynamic programming decision in compact format
+    if LOG_DEBUG:
+        var used_str = format_pitches_compact(used_pitches)
+        var match_val = 1 if match_flag else 0
+        var message = "DP|c:" + str(col) + "|r:" + str(row) + "|p:" + str(pitch) + 
+                     "|t:" + str(time) + "|vr:" + str(vert_rule) + "|hr:" + str(horiz_rule) + 
+                     "|f:" + str(final_val) + "|m:" + str(match_val) + "|u:[" + used_str + 
+                     "]|uc:" + str(unused_count)
+        debug_log(message)
+
+def init_debug_log():
+    if LOG_DEBUG:
+        var debug_path = getenv("DEBUG_LOG_FILE")
+        if debug_path:
+            DEBUG_FILE = open(debug_path, "w")
+            if DEBUG_FILE:
+                debug_log("# Score Following Debug Log - Compact Format")
+                debug_log("# Format: DP|c:col|r:row|p:pitch|t:time|vr:vert_rule|hr:horiz_rule|f:final|m:match|u:[used]|uc:unused_count")
+            else:
+                print "WARNING: Could not open debug log file:", debug_path
+
 class Ornaments:
     var trill_pitches
     var grace_pitches
@@ -703,6 +743,7 @@ class Score_follower:
 
 
     def init(rt, rc, labels):  // reference track and reference channel
+        init_debug_log()  // Initialize debug logging
         epsilon = get_epsilon(0)  // only for static matcher
         print "Initial epsilon is", epsilon * 1000, "msec"
         // print "labels", labels
@@ -1372,6 +1413,7 @@ class Score_follower:
                 new_time = prev.time  // chord time is unchanged
                 
             // now we decide whether to apply the horizontal rule
+            var vertical_value = cur.value  // save vertical rule value for logging
             if v > cur.value:
                 cur.value = v
                 cur.used = prev.used.copy()
@@ -1379,6 +1421,10 @@ class Score_follower:
                 cur.time = new_time
                 if match:
                     cur.used.append(pitch)
+            
+            // Log this DP decision in compact format
+            log_dp_decision(input_count, rk, pitch, time, vertical_value, v, 
+                           cur.value, report and cur.value > top_score, cur.used, cur.unused_count)
 
             // if LOG2 == true:
             //    display "  match score", rk, cur.value, top_score
@@ -1401,6 +1447,13 @@ class Score_follower:
         # display "in dynamic_match", mm.cur_upper_bound
 
         mm.got_result(result)
+        
+        // Log match result
+        if LOG_DEBUG:
+            if result.isa_match():
+                debug_log("MATCH|r:" + str(top_row) + "|p:" + str(pitch) + "|t:" + str(time) + "|score:" + str(top_score))
+            else:
+                debug_log("NO_MATCH|p:" + str(pitch) + "|t:" + str(time))
 
         // print "dynamic_match: match_stime", result.match_stime, "pos",
         // print     result.pos, "matches", result.matches
