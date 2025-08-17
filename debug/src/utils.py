@@ -253,8 +253,8 @@ def parse_log_line(line: str) -> Optional[Dict[str, Any]]:
             
             return result
     
-    # No pattern matched - this indicates a malformed log line
-    raise ValueError(f"No recognized pattern found for log line: '{line}'")
+    # No pattern matched - this is normal for Serpent output lines, just skip them
+    return None
 
 
 def save_json(data: Any, filepath: Path) -> None:

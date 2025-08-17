@@ -547,10 +547,10 @@ class FailureAnalyzer:
         ])
         
         if has_data:
-            logger.info(f"Extracted comprehensive context for pitch {failure_pitch}: "
-                       f"{len(relevant_timing)} timing checks ({len(context['timing_constraints']['failed_checks'])} failed), "
-                       f"{len(relevant_h_rules)} horizontal rules, "
-                       f"{len(relevant_match_types)} match type analyses")
+            logger.debug(f"Extracted comprehensive context for pitch {failure_pitch}: "
+                        f"{len(relevant_timing)} timing checks ({len(context['timing_constraints']['failed_checks'])} failed), "
+                        f"{len(relevant_h_rules)} horizontal rules, "
+                        f"{len(relevant_match_types)} match type analyses")
         else:
             raise RuntimeError(f"No comprehensive context data found for failure at {failure_time:.3f}s, pitch {failure_pitch} - "
                              f"targeted parsing may have missed this failure location")
@@ -558,18 +558,39 @@ class FailureAnalyzer:
         return context
     
     def _find_closest_time_for_pitch(self, line_number: int) -> float:
-        """Find the closest time for a given line number by looking at input events."""
-        if 'input_events' not in self.comprehensive_data:
-            raise RuntimeError("Comprehensive data missing input_events - parsing may have failed")
-        input_events = self.comprehensive_data['input_events']
-        for event in input_events:
-            if 'line_number' not in event:
-                raise RuntimeError(f"Input event missing line_number field: {event}")
-            if 'time' not in event:
-                raise RuntimeError(f"Input event missing time field: {event}")
-            if event['line_number'] <= line_number:
-                return event['time']
-        raise RuntimeError(f"No input event found for line number {line_number} - comprehensive data incomplete")
+        """Find the closest time for a given line number by looking at input events, falling back to DP decisions."""
+        # First try input events (most accurate for timing)
+        if 'input_events' in self.comprehensive_data:
+            input_events = self.comprehensive_data['input_events']
+            closest_event = None
+            for event in input_events:
+                if 'line_number' not in event:
+                    raise RuntimeError(f"Input event missing line_number field: {event}")
+                if 'time' not in event:
+                    raise RuntimeError(f"Input event missing time field: {event}")
+                if event['line_number'] <= line_number:
+                    if closest_event is None or event['line_number'] > closest_event['line_number']:
+                        closest_event = event
+            
+            if closest_event:
+                return closest_event['time']
+        
+        # Fallback: use DP decisions for timing (always available)
+        closest_decision = None
+        for decision in self.dp_decisions:
+            if decision.line_number <= line_number:
+                if closest_decision is None or decision.line_number > closest_decision.line_number:
+                    closest_decision = decision
+        
+        if closest_decision:
+            return closest_decision.time
+        
+        # If still no match found, use earliest available time
+        if self.dp_decisions:
+            logger.warning(f"No time data found for line {line_number}, using earliest DP decision time")
+            return min(d.time for d in self.dp_decisions)
+        
+        raise RuntimeError(f"No timing data available - both input events and DP decisions are empty")
     
     def _find_closest_time_for_decision(self, line_number: int) -> float:
         """Find time for decision by looking at nearby input events."""

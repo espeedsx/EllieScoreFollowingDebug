@@ -48,7 +48,7 @@ AI_ANALYSIS_MODEL = "claude-3-sonnet-20240229"
 
 # Compact log patterns
 LOG_PATTERNS = {
-    "dp_entry": r"DP\|c:(\d+)\|r:(\d+)\|p:(\d+)\|t:([\d.]+)\|vr:([-\d.]+)\|hr:([-\d.]+)\|f:([-\d.]+)\|m:([01])\|u:\[([\d,]*)\]\|uc:(\d+)",
+    "dp_entry": r"DP\|c:(\d+)\|r:(\d+)\|p:(\d+)\|t:([\d.]+)\|vr:([-\d.]+)\|hr:([-\d.]+)\|f:([-\d.]+)\|m:([01])\|u:\[([\d,\s]*)\]\|uc:([-\d]+)",
     "match_found": r"MATCH\|r:(\d+)\|p:(\d+)\|t:([\d.]+)\|score:([\d.]+)",
     "no_match": r"NO_MATCH\|p:(\d+)\|t:([\d.]+)",
     "test_start": r"TEST_START\|case:(\d+)\|score:(.*)\|perf:(.*)",
@@ -57,7 +57,7 @@ LOG_PATTERNS = {
     # Ultra-comprehensive logging patterns
     "input_event": r"INPUT\|c:(\d+)\|p:(\d+)\|t:([\d.]+)",
     "matrix_state": r"MATRIX\|c:(\d+)\|ws:(\d+)\|we:(\d+)\|wc:(\d+)\|cb:(\d+)\|pb:(\d+)\|cu:(\d+)\|pu:(\d+)",
-    "cell_state": r"CELL\|r:(\d+)\|v:([-\d.]+)\|u:\[([\d,]*)\]\|uc:(\d+)\|t:([-\d.]+)",
+    "cell_state": r"CELL\|r:(\d+)\|v:([-\d.]+)\|u:\[([\d,\s]*)\]\|uc:([-\d]+)\|t:([-\d.]+)",
     "vertical_rule": r"VRULE\|r:(\d+)\|up:([-\d.]+)\|pen:([-\d.]+)\|res:([-\d.]+)\|sp:(\w+)",
     "horizontal_rule": r"HRULE\|r:(\d+)\|pv:([-\d.]+)\|pit:(\d+)\|ioi:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|typ:(\w+)\|res:([-\d.]+)",
     "timing_check": r"TIMING\|pt:([-\d.]+)\|ct:([-\d.]+)\|ioi:([-\d.]+)\|span:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|type:(\w+)",
