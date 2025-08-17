@@ -1,373 +1,539 @@
-# Dynamic Score Following Algorithm - Technical Documentation
+# Score Following Algorithm: Complete Technical Documentation
 
 ## Overview
 
-This document provides comprehensive technical documentation of the dynamic score following algorithm implemented in `score_follower_v18_trill.srp`. The algorithm is based on the foundational work by Dannenberg & Bloch (ICMC '85) with significant enhancements for trill handling, timing constraints, and real-time performance optimization.
-
-**Score following** is the real-time task of tracking a musical performance against a known musical score, essentially solving a sequence alignment problem between performed notes and expected score events.
+This document provides comprehensive technical documentation for the EllieScoreFollowing implementation, a sophisticated real-time score following system based on the Dannenberg & Bloch (ICMC 1985) dynamic programming algorithm with extensive enhancements for musical ornament handling, timing robustness, and debugging capabilities.
 
 ## Core Algorithm Architecture
 
-### Problem Formulation
+### System Components
 
-The score following problem is formulated as a **modified dynamic programming sequence alignment** where:
+The score following system consists of four primary classes working in concert:
 
-- **Performance stream**: Sequence of incoming MIDI notes with timestamps
-- **Score reference**: Pre-processed sequence of compound events (Cevents) 
-- **Goal**: Find the longest common subsequence while respecting musical timing constraints
-- **Output**: Real-time position tracking with confidence scores
+#### 1. Score_follower (Main Controller)
+**Purpose**: Central orchestrator managing the entire score following process
+**Key Responsibilities**:
+- Strategy selection and switching (static vs dynamic)
+- Input note preprocessing and compound event construction
+- Top-level match result reporting and confidence tracking
+- Integration with MIDI processing pipeline
 
-### Dynamic Programming Foundation
-
+**Critical Data Members**:
+```serpent
+var ref_track        // Array of Cevent objects representing the score
+var match_mat        // Match_matrix instance managing DP computation
+var strategy         // 'static' or 'dynamic' algorithm strategy
+var current_cevt     // Currently accumulating performance compound event
+var top_score        // Best alignment score found so far
+var top_row          // Score position of best alignment
+var input_count      // Performance note counter for debugging
 ```
-Matrix[row, col] = max(
-    vertical_rule(row-1, col),     // Skip score event (missing note)
-    horizontal_rule(row, col-1)    // Match performance note to score event
-)
+
+#### 2. Match_matrix (DP Engine) 
+**Purpose**: Implements the core dynamic programming algorithm with windowed optimization
+**Key Responsibilities**:
+- Sliding window management within the conceptual DP matrix
+- Space-optimized storage (only current and previous columns)
+- Window repositioning based on match confidence
+- Base/upper bound index management for efficient access
+
+**Critical Data Members**:
+```serpent
+var cur_col          // Current DP column being computed
+var prev_col         // Previous DP column for diagonal access
+var win_center       // Expected score position (window center)
+var win_start        // Beginning of active window
+var win_end          // End of active window  
+var curbase          // Index offset for current column
+var prevbase         // Index offset for previous column
+var win_half_len     // Half-window size parameter
 ```
 
-Where:
-- **Rows** = Score events (compound events from reference track)
-- **Columns** = Performance events (incoming MIDI notes)  
-- **Cell values** = Cumulative alignment quality score
+**Window Management Invariants**:
+- `cur_col[0]` corresponds to matrix row `curbase`
+- `curbase = win_start - 1` for proper alignment
+- Window size = `2 * win_half_len + 1`
+- Window slides to track expected score position
 
-## Core Data Structures
+#### 3. Cevent (Compound Event)
+**Purpose**: Represents simultaneous notes in score/performance with ornament metadata
+**Key Responsibilities**:
+- Grouping simultaneous notes based on timing epsilon
+- Managing ornament information (trills, grace notes, ignore lists)
+- Computing expected note counts for DP scoring
+- Maintaining musical timing spans and relationships
 
-### Compound Events (Cevent)
+**Critical Data Members**:
+```serpent
+var time            // Score time of first note in compound event
+var pitches         // Array of MIDI note numbers in the chord
+var time_span       // Duration from first to last onset
+var ornaments       // Ornaments object with trill/grace/ignore pitches
+var expected        // Total expected notes (pitches + active trills)
+```
 
-Compound events group simultaneous or near-simultaneous notes into single scoring units:
+**Expected Count Calculation**:
+- Base: `len(pitches)` 
+- Add: Trill pitches not in ignore list
+- Subtract: Chord pitches in ignore list  
+- Grace notes are NOT counted in expected (handled separately)
+
+#### 4. Cell (DP Matrix Element)
+**Purpose**: Individual dynamic programming matrix cell with musical context
+**Key Responsibilities**:
+- Storing alignment score and timing information
+- Tracking which pitches have been matched
+- Maintaining unused note counts for penalty calculation
+- Providing musical context for decision making
+
+**Critical Data Members**:
+```serpent
+var value           // DP alignment score  
+var time            // Time of last matched note
+var used            // Array of matched pitches in this alignment path
+var unused_count    // Number of expected notes not yet matched
+```
+
+### Algorithm Strategies
+
+#### Static Strategy
+**When Used**: Default strategy, suitable for performances with regular timing
+**Characteristics**:
+- Uses epsilon-based note grouping (default 75ms)
+- Simple DP scoring: +1 for match, penalties for missing/extra/wrong notes
+- Fixed cost parameters: `scm` (missing), `sce` (extra), `scw` (wrong)
+- Compound event matching via `cevt_match()` with configurable threshold
+
+**DP Rules**:
+1. **Vertical (Skip Score)**: `score = curcol(rk-1) - scm`
+2. **Horizontal (Skip Performance)**: `score = prevcol(rk) - sce`  
+3. **Diagonal (Match/Mismatch)**: `score = prevcol(rk-1) + (1 if match else -scw)`
+
+#### Dynamic Strategy  
+**When Used**: Complex performances with irregular timing, ornaments, expressive timing
+**Characteristics**:
+- Individual note processing (no epsilon grouping)
+- Context-aware scoring with musical semantics
+- Timing constraint validation for all matches
+- Sophisticated ornament handling (trills, grace notes)
+- Adaptive cost parameters based on musical context
+
+**DP Rules**:
+1. **Vertical (Skip Score)**: `score = curcol(rk-1) - (dcm * unused_count)`
+2. **Horizontal (Match with Constraints)**: Complex rule with multiple musical cases
+3. **No Diagonal Rule**: Uses horizontal rule for matching logic
+
+## Dynamic Programming Implementation
+
+### Mathematical Formulation
+
+The score following problem is formulated as finding the optimal alignment between:
+- **Performance Stream**: P = [p₁, p₂, ..., pₙ] (time-ordered notes)
+- **Score Stream**: S = [s₁, s₂, ..., sₘ] (compound events with ornament metadata)
+
+**Objective**: Maximize alignment score function:
+```
+Score(i,j) = max {
+    Score(i-1,j) - VerticalCost(sᵢ),      // Skip score event
+    Score(i,j-1) - HorizontalCost(pⱼ),    // Skip performance note  
+    Score(i-1,j-1) + DiagonalReward(sᵢ,pⱼ) // Match/mismatch
+}
+```
+
+### Dynamic Strategy DP Rules (Core Algorithm)
+
+#### Vertical Rule: Score Event Skipping
+**Purpose**: Handle missing notes in performance
+**Formula**: `new_score = prev_up_score - (dcm × unused_count)`
+**When Applied**: Always computed first for each cell
+**Parameters**:
+- `dcm = 2`: Dynamic cost multiplier for missing notes
+- `unused_count`: Number of expected notes not yet matched in score event
+
+**Musical Interpretation**: 
+- Penalty scales with number of missing notes in chord
+- More severe penalty for skipping large chords
+- Allows algorithm to skip difficult passages gracefully
 
 ```serpent
-class Cevent:
-    var time       // Score time of first note (seconds)
-    var pitches    // Array of MIDI pitch numbers in the chord
-    var time_span  // Time difference between first and last note onsets
-    var ornaments  // Trill/grace note information (Ornaments object)
-    var expected   // Total number of notes expected to match
+// Vertical rule implementation
+if start_point_check:
+    vertical_penalty = dcm * curup.unused_count
+    cur.value = curup.value - vertical_penalty
+else:
+    cur.value = curup.value
 ```
 
-**Key Properties**:
-- `expected = len(pitches) + len(trill_pitches_not_ignored)`
-- Grace notes are not counted in `expected` (no penalty for missing)
-- Time span enables timing tolerance for rolled chords
+#### Horizontal Rule: Performance Note Matching
+**Purpose**: Process incoming performance notes with musical context awareness
+**Complexity**: Multiple cases based on musical semantics
+**Parameters**:
+- `dmc = 2`: Dynamic match credit for successful note matches
+- `dgc = 1`: Dynamic grace note credit (lower than chord notes)
+- `dce = 1`: Dynamic cost for extra notes
 
-### Cell State Management
-
-Each dynamic programming cell maintains comprehensive state:
-
+**Case 1: Chord Note Matching**
 ```serpent
-class Cell:
-    var value        // Cumulative alignment score
-    var used         // Array of matched pitches in this chord
-    var time         // Time when cell was last updated (-1 if uninitialized)
-    var unused_count // Number of expected pitches not yet matched
-```
-
-**Critical Implementation Detail**: Cells initialize with `time = -1`, causing the algorithm bug where IOI calculations become `current_time - (-1) = current_time + 1`, resulting in nonsensical timing values.
-
-### Match Matrix Windowing
-
-The algorithm uses a sliding window approach to optimize memory and computation:
-
-```serpent
-class Match_matrix:
-    var cur_col       // Current column being computed
-    var prev_col      // Previous column (for horizontal rule access)
-    var win_center    // Expected match position
-    var win_start     // Start of processing window (1-based)
-    var win_end       // End of processing window (1-based)
-    var win_half_len  // Window radius (default: 10 for debugging, should be 30)
-    var curbase       // Offset: cur_col[0] represents matrix row curbase
-    var prevbase      // Offset for previous column
-```
-
-**Window Management**:
-- Window size: `win_half_len * 2 + 1`
-- Window repositioning: `win_center = last_match_position + 1`
-- Boundary handling: `win_start = max(start_point, win_center - win_half_len)`
-
-## Dynamic Programming Algorithm
-
-### Core Processing Loop
-
-For each incoming performance note, the algorithm processes a window of score events:
-
-```serpent
-def dynamic_match(time, pitch, result):
-    // 1. Initialize current column window
-    mm.curbase = mm.win_start - 1
+if ((pitch in cur_cevt.pitches) and 
+    (pitch not in prev.used) and 
+    timing_ok):
     
-    // 2. Process each row in the window
-    for rk = mm.win_start to mm.win_end:
-        // 3. Apply vertical rule (score advancement)
-        apply_vertical_rule(rk)
-        
-        // 4. Apply horizontal rule (note matching)
-        apply_horizontal_rule(rk, pitch, time)
-        
-        // 5. Select best result: max(vertical, horizontal)
-        finalize_cell_decision(rk)
-        
-        // 6. Update top score if this is the best match
-        update_top_score_if_better(rk)
-```
-
-### Vertical Rule: Score Advancement
-
-The vertical rule handles advancing through the score without matching the current performance note:
-
-```serpent
-def apply_vertical_rule(rk):
-    var cur = mm.curcol(rk)
-    var curup = mm.curcol(rk - 1)  // Cell above (previous score event)
-    
-    var vertical_penalty = 0
-    if rk > match_mat.start_point:
-        // Penalty for skipping expected notes
-        vertical_penalty = dcm * curup.unused_count
-        cur.value = curup.value - vertical_penalty
+    if pitch in ignore_pitches:
+        score = prev.value  // No credit, but no penalty
     else:
-        cur.value = curup.value  // No penalty at start
-    
-    // Initialize for this score event
-    cur.used.clear()
-    cur.unused_count = current_score_event.expected
+        score = prev.value + dmc  // Full credit
+        report_match = true
 ```
 
-**Key Parameters**:
-- `dcm` (dynamic cost missing) = 2: Penalty per unmatched expected note
-- Boundary condition: No penalty before `start_point`
-
-### Horizontal Rule: Note Matching
-
-The horizontal rule handles matching the performance note to the current score event:
-
+**Case 2: Trill Note Matching**  
 ```serpent
-def apply_horizontal_rule(rk, pitch, time):
-    var prev = get_previous_cell(rk)  // From previous column
-    var cur_cevt = ref_track[rk - 1]  // Current score event
+if ((pitch in trill_pitches) and
+    ((len(prev.used) == 0) or (ioi < trill_max_ioi))):
     
-    // Calculate timing constraint
-    var ioi = time - prev.time
-    var timing_limit = cur_cevt.time_span + 0.1  // 100ms + chord time span
-    var timing_ok = (len(prev.used) == 0) or (ioi < timing_limit)
-    
-    // Determine match type and calculate value
-    var horizontal_value = prev.value
-    var match_type = determine_match_type(pitch, cur_cevt, prev, timing_ok)
-    
-    switch match_type:
-        case "chord_matched":
-            horizontal_value = prev.value + dmc  // Match credit
-            update_used_pitches(pitch)
-        case "trill_matched":  
-            horizontal_value = prev.value + dmc
-            // Trills don't count toward expected
-        case "grace_matched":
-            horizontal_value = prev.value + dgc  // Grace note credit
-        case "extra_note":
-            horizontal_value = prev.value - dce  // Extra note penalty
-        case "chord_ignored":
-            horizontal_value = prev.value  // No change for ignored notes
-```
-
-**Key Parameters**:
-- `dmc` (dynamic match credit) = 2: Reward for matching expected note
-- `dgc` (dynamic grace credit) = 1: Reward for matching grace note  
-- `dce` (dynamic cost extra) = 1: Penalty for extra note
-
-### Match Type Classification
-
-The algorithm classifies each performance note into specific categories:
-
-#### 1. Chord Note Matching
-```serpent
-if (pitch in cur_cevt.pitches) and (pitch not in prev.used) and timing_ok:
-    // Regular chord note match
-    if pitch in ornaments.ignore_pitches:
-        match_type = "chord_ignored"  // No credit/penalty
+    if (pitch in prev.used) or (pitch in ignore_pitches):
+        score = prev.value  // No additional credit
     else:
-        match_type = "chord_matched"  // Full credit
+        score = prev.value + dmc  // Same credit as chord note
 ```
 
-#### 2. Trill Note Matching  
+**Case 3: Grace Note Matching**
 ```serpent
-if (pitch in cur_cevt.ornaments.trill_pitches) and (ioi < trill_max_ioi):
-    if pitch in prev.used:
-        match_type = "trill_repeated"  // No additional credit
-    elif pitch in ornaments.ignore_pitches:
-        match_type = "trill_ignored"   // No credit
-    else:
-        match_type = "trill_matched"   // Full credit
-```
-
-**Trill Timing**: `trill_max_ioi = 0.35s` (maximum inter-onset interval for trill notes)
-
-#### 3. Grace Note Matching
-```serpent
-if (pitch in cur_cevt.ornaments.grace_pitches) and (ioi < grace_max_ioi):
-    // Grace notes must occur before chord notes
-    var beyond_grace_notes = any(p not in grace_pitches for p in prev.used)
+if ((pitch in grace_pitches) and
+    ((len(prev.used) == 0) or (ioi < grace_max_ioi))):
+    
     if beyond_grace_notes:
-        match_type = "grace_after_chord"  // Penalty
+        score = prev.value - dce  // Penalty for late grace note
     else:
-        match_type = "grace_matched"      // Grace credit
+        score = prev.value + dgc  // Reduced credit
 ```
 
-#### 4. Extra Note Handling
+**Case 4: No Match (Extra Note)**
 ```serpent
 else:
-    match_type = "extra_note"  // Penalty for unmatched note
+    score = prev.value - dce  // Penalty for extra note
+    time = prev.time  // Don't advance timing
 ```
 
-### Cell Decision Logic
+### Timing Constraints
 
-After computing both vertical and horizontal rules, select the best result:
+#### Purpose: Ensure musical plausibility of alignments
+**Core Principle**: Inter-onset intervals (IOI) must be musically reasonable
+
+#### Timing Validation Rules:
+
+1. **Chord Notes**: `IOI < cevent.time_span + 0.1`
+   - Based on score timing span of compound event
+   - Allows slight performance timing variation
+
+2. **Trill Notes**: `IOI < trill_max_ioi` (typically 0.2 seconds)
+   - Rapid note repetition characteristic of trills
+   - Prevents matching distant notes as trill continuations
+
+3. **Grace Notes**: `IOI < grace_max_ioi` (typically 0.1 seconds)  
+   - Very tight timing for ornamental notes
+   - Must occur immediately before or during main notes
+
+4. **First Note Exception**: First note in sequence always passes timing
+   - Prevents initial timing constraint violations
+   - Allows algorithm to start alignment process
 
 ```serpent
-def finalize_cell_decision(rk):
-    var cur = mm.curcol(rk)
-    var vertical_value = cur.value
-    var horizontal_value = computed_horizontal_value
+// Timing constraint implementation
+var timing_limit = (grace_max_ioi if prev_unused_count == cur_cevt.expected 
+                   else cur_cevt.time_span + 0.1)
+var timing_ok = ((len(prev.used) == 0) or (time - prev.time < timing_limit))
+```
+
+### Window Management Algorithm
+
+#### Purpose: Optimize DP computation by limiting search space
+**Core Insight**: Performance typically stays close to expected score position
+
+#### Window Structure:
+- **Center**: Expected score position based on timing/tempo
+- **Size**: `2 * win_half_len + 1` (typically 21 rows)
+- **Bounds**: `[win_start, win_end)` with safety constraints
+
+#### Window Movement Strategy:
+1. **Successful Match**: Move center toward match position
+2. **No Match**: Slide window down by 1 row
+3. **Confidence-Based**: Higher scores justify larger movements
+4. **Boundary Constraints**: Never exceed score start/end
+
+```serpent
+// Window repositioning logic
+if match_found:
+    new_center = match_row + confidence_adjustment
+else:
+    new_center = old_center + 1  // Slide down
+
+// Apply safety constraints  
+new_center = max(new_center, start_point + win_half_len)
+new_center = min(new_center, length - win_half_len)
+```
+
+## Musical Context Processing
+
+### Compound Event Construction
+
+#### Score Processing Pipeline:
+1. **MIDI Input**: Raw note events with timing and pitch
+2. **Epsilon Grouping**: Cluster simultaneous notes (configurable epsilon)
+3. **Ornament Integration**: Apply trill/grace annotations from labels
+4. **Expected Count Calculation**: Compute total expected notes per event
+
+```serpent
+// Cevent construction from MIDI notes
+def ref_to_cevts(note_track, channel, labels):
+    var cevts = []
+    var current_cevent = nil
     
-    if horizontal_value > vertical_value:
-        // Horizontal rule wins - accept the match
-        cur.value = horizontal_value
-        cur.used = prev.used.copy()
-        cur.unused_count = prev.unused_count - (1 if match else 0)
-        cur.time = time
-        if match:
-            cur.used.append(pitch)
-    // Otherwise keep vertical rule result
+    for note in note_track:
+        if note.chan != channel: continue
+        
+        // Group notes by timing epsilon
+        if not current_cevent or (note.time - current_cevent.time > epsilon):
+            current_cevent = Cevent(note.time)
+            cevts.append(current_cevent)
+        
+        current_cevent.add_note(note.key)
+    
+    // Apply ornament labels
+    apply_ornament_labels(cevts, labels)
+    return cevts
 ```
 
-## Timing Constraint System
+### Ornament Handling System
 
-### IOI-Based Grouping
+#### Trill Processing
+**Purpose**: Handle rapid alternating note patterns that occur frequently in classical music
+**Challenge**: Variable number of notes, indeterminate pitches
+**Solution**: Treat as compound events with special matching rules
 
-The algorithm uses Inter-Onset Intervals (IOI) to determine if notes belong together:
+**Trill Detection**:
+- Manual annotation via labels file
+- Automatic detection via `trillfinder.srp` (rapid alternating pitches)
+- Integration with score compound events
+
+**Trill Matching Logic**:
+```serpent
+// Trill note matching
+if pitch in trill_pitches:
+    if timing_ok and not already_used:
+        credit = dmc  // Same as chord note
+        add_to_used_list(pitch)
+    else:
+        credit = 0  // No penalty, but no additional credit
+```
+
+#### Grace Note Processing  
+**Purpose**: Handle ornamental notes that occur just before main notes
+**Characteristics**: Very tight timing constraints, lower scoring weight
+**Musical Context**: Must occur before moving to next chord
+
+**Grace Note Logic**:
+```serpent
+if pitch in grace_pitches:
+    if beyond_grace_notes:  // Already moved to chord notes
+        penalty = dce  // Late grace note
+    else:
+        credit = dgc  // Reduced credit (1 vs 2 for chord)
+```
+
+#### Ignore Pitch Mechanism
+**Purpose**: Handle ornament variations that shouldn't be expected
+**Use Cases**: 
+- Trill variations (upper/lower neighbors)
+- Optional ornament notes
+- Performance-dependent decorations
+
+**Implementation**: Ignore pitches receive no credit but no penalty
+
+### Performance Event Processing
+
+#### Input Note Pipeline:
+1. **Timing Analysis**: Calculate inter-onset interval from previous note
+2. **Compound Event Grouping**: Determine if note continues current cevent  
+3. **DP Matrix Update**: Process note through dynamic programming
+4. **Match Reporting**: Report successful alignments with confidence
+
+#### Epsilon-Based Grouping (Static Strategy):
+```serpent
+def eps_test(evt_time):
+    var result = evt_time - last_evt_time > epsilon
+    last_evt_time = evt_time
+    return result
+
+// In static_match():
+if eps_test(time):  // New compound event
+    current_cevt = Cevent(time)
+    match_mat.swap()  // Move to next DP column
+```
+
+## Advanced Features and Debugging Infrastructure
+
+### Multi-Strategy Support
+
+#### Strategy Switching:
+- **Runtime Selection**: Can switch between static/dynamic during execution
+- **Performance Adaptation**: Choose strategy based on musical complexity
+- **Graceful Transition**: Proper state management during switches
 
 ```serpent
-var ioi = current_time - previous_cell_time
-var timing_limit = score_event.time_span + 0.1  // 100ms base + chord span
-
-if ioi < timing_limit:
-    // Notes are close enough to group together
-else:
-    // Too much time has passed, treat as separate events
+def set_strategy(new_strategy):
+    if new_strategy == strategy: return
+    
+    // Reinitialize matrix with new strategy
+    if new_strategy == 'static':
+        cur_col = [0 for i = 0 to len(cur_col)]
+        prev_col = [SF_NINF for i = 0 to len(prev_col)]
+    elif new_strategy == 'dynamic':
+        cur_col = [Cell(0) for i = 0 to len(cur_col)]
+        prev_col = [Cell(SF_NINF) for i = 0 to len(prev_col)]
+    
+    strategy = new_strategy
 ```
 
-### Timing Constraint Types
+### Comprehensive Debug Logging System
 
-1. **Chord Basic**: `time_span + 0.1s`
-2. **Chord Full**: Considers ornament timing  
-3. **Trill**: `trill_max_ioi = 0.35s`
-4. **Grace**: `grace_max_ioi` (dynamically set)
+#### Design Principles:
+- **Selective Instrumentation**: Debug levels control verbosity
+- **Compact Format**: Minimize token usage for AI analysis
+- **Complete Context**: Capture all decision-making information
+- **Non-Invasive**: Zero performance impact when disabled
 
-### Algorithm Bug: Cell Time Initialization
+#### Debug Log Hierarchy:
+- `LOG_DEBUG`: Complete DP decision logging (for AI analysis)
+- `LOG_ROGER`: Algorithm developer debugging output
+- `LOG1`: High-level algorithm flow
+- `LOG2`: Detailed DP calculations  
+- `LOG3`: Matrix state and intermediate values
 
-**Critical Issue**: Cells initialize with `time = -1`, causing invalid IOI calculations:
-
+#### Compact Log Format Design:
 ```
-ioi = current_performance_time - (-1) = current_performance_time + 1
+INPUT|column:N|pitch:P|perf_time:T
+MATRIX|column:N|window_start:S|window_end:E|window_center:C|...
+CEVENT|row:R|score_time:T|pitch_count:N|time_span:S|ornament_count:O|expected:E
+CELL|row:R|value:V|used_pitches:[P1,P2]|unused_count:U|cell_time:T|score_time:S
+TIMING|prev_cell_time:T|curr_perf_time:T|ioi:I|span:S|limit:L|timing_pass:P|constraint_type:C
+VRULE|row:R|up_value:V|penalty:P|result:R|start_point:S
+HRULE|row:R|prev_value:V|pitch:P|ioi:I|limit:L|timing_pass:P|match_type:M|result:R
+DECISION|row:R|vertical_result:V|horizontal_result:H|winner:W|updated:U|final_value:F|reason:R
+DP|column:C|row:R|pitch:P|perf_time:T|vertical_rule:V|horizontal_rule:H|final_value:F|match:M|used_pitches:[P1,P2]|unused_count:U
+MATCH|row:R|pitch:P|perf_time:T|score:S
+NO_MATCH|pitch:P|perf_time:T
 ```
 
-This results in IOI values like 29.307 seconds for a 28.307s performance note, causing false timing constraint failures.
+#### AI-Optimized Analysis Pipeline:
+1. **Compact Capture**: Store every DP decision in minimal format
+2. **Block Processing**: Group logs by INPUT boundaries  
+3. **Context Extraction**: Identify failure patterns and decision contexts
+4. **Focused Prompts**: Generate specific AI analysis requests
+5. **Iterative Improvement**: Apply insights to algorithm parameters
 
-## Window Management Strategy
+### Performance Optimization Features
 
-### Adaptive Window Positioning
+#### Space Optimization:
+- **Two-Column Storage**: Only current and previous DP columns
+- **Window Bounds**: Limit computation to relevant score region
+- **Cell Reuse**: Efficient memory management for Cell objects
 
+#### Time Optimization:
+- **Early Termination**: Skip cells with impossible scores
+- **Incremental Updates**: Only recompute changed portions
+- **Vectorized Operations**: Batch similar calculations where possible
+
+#### Real-Time Considerations:
+- **Bounded Computation**: Guaranteed maximum processing time per note
+- **Graceful Degradation**: Reduce window size under time pressure
+- **Priority Processing**: Focus computation on most promising alignments
+
+## Implementation Details and Parameter Specifications
+
+### Algorithm Parameters
+
+#### Static Strategy Parameters:
 ```serpent
-def update_window_position():
-    if (top_score > last_top_score) and (match_position > last_max_position):
-        new_center = match_position + 1
-        win_start = max(start_point, new_center - win_half_len)
-        win_end = min(score_length + 1, new_center + win_half_len)
+epsilon = 0.075        // Note grouping threshold (seconds)
+static_threshold = 0.5 // Match confidence threshold
+scm = 1               // Static cost of missing notes
+sce = 0               // Static cost of extra notes  
+scw = 1               // Static cost of wrong notes
 ```
 
-### Memory Optimization
-
-The algorithm maintains only two columns in memory:
-
+#### Dynamic Strategy Parameters:
 ```serpent
-def column_swap():
-    temp = prev_col
-    prev_col = cur_col  
-    cur_col = temp
-    // Update base indices accordingly
+dmc = 2               // Dynamic match credit
+dgc = 1               // Dynamic grace note credit
+dcm = 2               // Dynamic cost of missing notes
+dce = 1               // Dynamic cost of extra notes
+win_half_len = 10     // Window half-size (total window = 21)
+trill_max_ioi = 0.2   // Maximum trill inter-onset interval
+grace_max_ioi = 0.1   // Maximum grace note inter-onset interval
 ```
 
-**Memory Usage**: O(window_size) instead of O(score_length × performance_length)
+### Data Structure Specifications
 
-## Performance Characteristics
+#### Match_matrix Invariants:
+- `cur_col[0]` represents matrix row `curbase`
+- `curbase = win_start - 1` for proper indexing
+- `win_end = win_center + win_half_len` (bounded by score length)
+- `prev_upper_bound` saved from previous column's `win_end`
 
-### Time Complexity
-- **Per Note**: O(window_size) ≈ O(20) for typical window
-- **Total**: O(window_size × num_performance_notes)
+#### Cell Object Properties:
+- `value`: DP score (can be negative)
+- `time`: Last match time (initialized to -1)
+- `used`: Array of matched pitches (for duplicate detection)
+- `unused_count`: Expected notes not yet matched
 
-### Space Complexity
-- **Active Memory**: O(window_size) for two columns
-- **Window Size**: Typically 21 cells (10 + 1 + 10)
+#### Cevent Construction Rules:
+- `pitches`: Core chord tones only
+- `ornaments.trill_pitches`: Trill decoration notes
+- `ornaments.grace_pitches`: Grace note decorations  
+- `ornaments.ignore_pitches`: Performance-optional notes
+- `expected = len(pitches) + active_trill_count - ignored_chord_count`
 
-### Real-Time Performance
-- **Target**: Process each note within microseconds
-- **Scaling**: Linear with window size, independent of total score length
+### Error Handling and Edge Cases
 
-## Algorithm Output and Reporting
+#### Boundary Conditions:
+- **Empty Performance**: Graceful degradation with all vertical moves
+- **Empty Score**: Reject all performance notes as extra
+- **Window Boundaries**: Safe indexing with out-of-window cell
+- **Timing Initialization**: First note always passes timing constraints
 
-### Match Reporting
+#### Robustness Mechanisms:
+- **Score Bounds Checking**: Prevent array access violations
+- **Overflow Protection**: Use bounded integer arithmetic  
+- **Invalid State Recovery**: Reset to known good state on errors
+- **Graceful Fallbacks**: Default to safe behaviors on unexpected input
 
+#### Debug Assertions:
 ```serpent
-if cur.value > top_score and report:
-    result.match_stime = cur_cevt.time      // Score time of match
-    result.pos = rk - 1                     // Score position (0-based)
-    result.matches = top_score              // Confidence score
-    top_score = cur.value
+// Critical invariant checks (when debugging enabled)
+assert(win_start >= 1)
+assert(win_end <= length + 1)
+assert(curbase == win_start - 1)
+assert(len(cur_col) >= win_end - win_start)
 ```
 
-### Confidence Scoring
+### Integration Points
 
-The algorithm maintains a running confidence score based on:
-- Cumulative match credits minus penalties
-- Higher values indicate stronger alignment confidence
-- Sudden drops may indicate tracking errors
+#### MIDI Processing Integration:
+- **Input**: Alg_note objects from MIDI parser
+- **Timing**: Convert MIDI beats to seconds using tempo map
+- **Channel Filtering**: Process only specified instrument channel
+- **Note Grouping**: Epsilon-based simultaneous note detection
 
-## Integration with Real-Time Systems
+#### Label System Integration:
+- **Trill Labels**: `trill [pitch1, pitch2, ...]` with start/stop times
+- **Grace Labels**: `grace [pitch1, pitch2, ...]` or `grace insert [...]`
+- **Epsilon Labels**: `epsilon value` to adjust grouping threshold
+- **Parameter Labels**: Dynamic adjustment of algorithm parameters
 
-### Virtual Clock Synchronization
+#### Accompaniment System Integration:
+- **Match Reporting**: Real-time score position updates
+- **Confidence Scoring**: Match quality assessment for tempo following
+- **Error Recovery**: Graceful handling of tracking loss
+- **State Synchronization**: Coordinate with virtual clock system
 
-```serpent
-VirtualTime = (R - Rref) * S + Vref
-```
-Where:
-- `R` = current real time
-- `Rref` = last reset time
-- `S` = speed of virtual clock  
-- `Vref` = virtual score time at last reset
-
-### Accompaniment Timing
-
-The algorithm provides real-time position estimates for:
-- Automated accompaniment synchronization
-- Score display following
-- Performance analysis recording
-
-## Key Algorithmic Innovations
-
-1. **Compound Event Grouping**: Handles chords as single units
-2. **Ornament-Aware Matching**: Specialized handling for trills and grace notes
-3. **Adaptive Timing Constraints**: IOI-based note grouping with score-aware limits
-4. **Sliding Window Optimization**: Bounded memory usage for real-time performance
-5. **Multi-Credit System**: Differentiated rewards for different note types
-
-## Conclusion
-
-The dynamic score following algorithm represents a sophisticated real-time sequence alignment system specifically designed for musical performance tracking. Its key strengths lie in:
-
-- **Musical Intelligence**: Understanding of ornaments, chord structures, and timing conventions
-- **Real-Time Performance**: Bounded computation and memory usage
-- **Robustness**: Graceful handling of extra notes, missing notes, and timing variations
-- **Extensibility**: Parameterized credit/penalty system for different musical styles
-
-The algorithm successfully balances the competing demands of accuracy, real-time performance, and musical understanding, making it suitable for both research applications and practical musical systems.
+This comprehensive technical documentation provides the detailed algorithmic understanding needed for effective debugging, optimization, and enhancement of the score following system. The combination of mathematical rigor, implementation specifics, and debugging infrastructure enables systematic analysis and improvement of algorithm performance.
