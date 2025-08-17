@@ -816,72 +816,68 @@ class FailureAnalyzer:
         return winners
     
     def _analyze_timing_failures(self, failed_checks: List[Dict]) -> List[Dict]:
-        """Analyze detailed timing constraint failures with tempo awareness."""
+        """Analyze detailed timing constraint failures."""
         failures = []
         for check in failed_checks[:5]:  # Limit to first 5 for prompt size
             if all(key in check for key in ['ioi', 'limit', 'constraint_type', 'curr_time']):
-                # Extract performance timing information
-                performance_ioi = check['ioi']
+                # Extract score row timing information
+                score_row_gap = check['ioi']  # Time since this score row last matched
                 timing_limit = check['limit']
                 constraint_type = check['constraint_type']
                 
                 # Calculate excess timing
-                excess_seconds = performance_ioi - timing_limit
+                excess_seconds = score_row_gap - timing_limit
                 excess_ms = excess_seconds * 1000
                 
-                # Analyze tempo context if available
-                tempo_context = self._analyze_tempo_context(check)
+                # Analyze score row timing context
+                score_context = self._analyze_score_row_timing_context(check)
                 
                 failure_detail = {
-                    'performance_ioi': performance_ioi,
+                    'score_row_gap': score_row_gap,
                     'timing_limit': timing_limit,
                     'excess_seconds': excess_seconds,
                     'excess_ms': excess_ms,
                     'constraint_type': constraint_type,
                     'time': check['curr_time'],
-                    'tempo_ratio': tempo_context.get('estimated_tempo_ratio', 'unknown'),
-                    'tempo_context': tempo_context
+                    'prev_time': check.get('prev_time', -1),
+                    'score_timing_context': score_context
                 }
                 failures.append(failure_detail)
         return failures
     
-    def _analyze_tempo_context(self, timing_check: Dict) -> Dict[str, Any]:
-        """Analyze tempo context for a timing check."""
+    def _analyze_score_row_timing_context(self, timing_check: Dict) -> Dict[str, Any]:
+        """Analyze score row timing constraint context."""
         try:
             curr_time = timing_check.get('curr_time', 0)
             prev_time = timing_check.get('prev_time', 0)
             constraint_type = timing_check.get('constraint_type', 'unknown')
-            ioi = timing_check.get('ioi', 0)
+            score_row_gap = timing_check.get('ioi', 0)  # Time since this score row last matched
             
-            # Check if this is a valid timing calculation
-            # IOI > 10 seconds or prev_time < 0 indicates initialization issues
-            is_valid_timing = prev_time >= 0 and ioi < 10.0
+            # This is NOT performance IOI - it's the gap since this score row last matched a note
+            is_uninitialized = prev_time < 0
             
-            if not is_valid_timing:
+            if is_uninitialized:
                 return {
-                    'performance_time_range': f"invalid (prev_time: {prev_time:.3f}s, curr_time: {curr_time:.3f}s)",
-                    'performance_ioi': ioi,
-                    'expected_score_ioi': self._estimate_score_ioi(constraint_type),
-                    'estimated_tempo_ratio': 'invalid',
-                    'tempo_interpretation': 'Invalid timing data - likely algorithm initialization artifact',
-                    'note': 'Previous time is uninitialized (-1) or IOI is unrealistically large'
+                    'timing_type': 'score_row_constraint',
+                    'last_match_time': 'uninitialized (-1)',
+                    'current_note_time': f"{curr_time:.3f}s",
+                    'score_row_gap': f"{score_row_gap:.3f}s",
+                    'constraint_limit': self._estimate_score_ioi(constraint_type),
+                    'interpretation': 'No previous match to this score row - checking if current note can start new chord',
+                    'constraint_type': constraint_type
                 }
             
-            # For valid timing, calculate tempo ratio
-            expected_score_ioi = self._estimate_score_ioi(constraint_type)
-            tempo_ratio = 'unknown'
-            if expected_score_ioi and expected_score_ioi > 0:
-                tempo_ratio = ioi / expected_score_ioi
-            
             return {
-                'performance_time_range': f"{prev_time:.3f}s to {curr_time:.3f}s",
-                'performance_ioi': ioi,
-                'expected_score_ioi': expected_score_ioi,
-                'estimated_tempo_ratio': tempo_ratio,
-                'tempo_interpretation': self._interpret_tempo_ratio(tempo_ratio)
+                'timing_type': 'score_row_constraint',
+                'last_match_time': f"{prev_time:.3f}s",
+                'current_note_time': f"{curr_time:.3f}s", 
+                'score_row_gap': f"{score_row_gap:.3f}s",
+                'constraint_limit': self._estimate_score_ioi(constraint_type),
+                'interpretation': f'Time since this score row last matched a note: {score_row_gap:.3f}s',
+                'constraint_type': constraint_type
             }
         except Exception as e:
-            return {'error': f"Tempo analysis failed: {e}"}
+            return {'error': f"Score row timing analysis failed: {e}"}
     
     def _estimate_score_ioi(self, constraint_type: str) -> Optional[float]:
         """Estimate expected score IOI based on constraint type."""
@@ -916,41 +912,28 @@ class FailureAnalyzer:
             return 'Invalid tempo ratio'
     
     def _analyze_horizontal_rules(self, h_rules: List[Dict]) -> List[Dict]:
-        """Analyze detailed horizontal rule calculations with tempo awareness."""
+        """Analyze detailed horizontal rule calculations."""
         calculations = []
         for rule in h_rules[:5]:  # Limit for prompt size
             # Use actual field names from parsed data
             if all(key in rule for key in ['pitch', 'ioi', 'limit', 'timing_pass', 'match_type', 'result']):
-                ioi = rule['ioi']
+                score_row_gap = rule['ioi']  # Time since this score row last matched
                 limit = rule['limit']
                 match_type = rule['match_type']
                 
-                # Check if IOI indicates invalid timing (initialization artifact)
-                is_valid_ioi = ioi < 10.0  # Reasonable performance timing
-                timing_status = "VALID" if is_valid_ioi else "INVALID (initialization artifact)"
-                
-                # Only do tempo analysis for valid IOI values
-                tempo_context = None
-                if is_valid_ioi:
-                    expected_score_ioi = self._estimate_score_ioi(match_type)
-                    if expected_score_ioi and expected_score_ioi > 0:
-                        tempo_ratio = ioi / expected_score_ioi
-                        tempo_context = {
-                            'expected_score_ioi': expected_score_ioi,
-                            'tempo_ratio': tempo_ratio,
-                            'tempo_interpretation': self._interpret_tempo_ratio(tempo_ratio)
-                        }
+                # Determine if this is an uninitialized score row
+                is_uninitialized = score_row_gap > 10.0  # Unrealistically large gap
                 
                 calc_detail = {
                     'pitch': rule['pitch'],
-                    'performance_ioi': ioi,
+                    'score_row_gap': score_row_gap,
                     'timing_limit': limit,
                     'timing_pass': rule['timing_pass'],
                     'match_type': match_type,
                     'result': rule['result'],
-                    'excess_ms': (ioi - limit) * 1000 if ioi > limit else 0,
-                    'timing_status': timing_status,
-                    'tempo_analysis': tempo_context
+                    'excess_ms': (score_row_gap - limit) * 1000 if score_row_gap > limit else 0,
+                    'interpretation': 'Score row never matched (uninitialized)' if is_uninitialized 
+                                   else f'Score row last matched {score_row_gap:.3f}s ago'
                 }
                 calculations.append(calc_detail)
         return calculations

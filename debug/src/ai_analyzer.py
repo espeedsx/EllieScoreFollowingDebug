@@ -82,9 +82,9 @@ The dynamic programming algorithm uses these key components:
 
 **Key Timing Concepts:**
 - **Performance Time**: Actual timing of performed notes (may vary from score tempo)
-- **Performance IOI**: Time intervals between consecutive performance notes
-- **Algorithm Limits**: Timing constraints based on musical context (chord, trill, grace notes)
-- **Tempo Relationship**: How performance speed compares to expected score timing
+- **Score Row Timing**: Time since each score row last matched a performance note
+- **Timing Constraints**: Limits on how long after a score row's last match a new note can be grouped with it
+- **Chord Grouping**: Algorithm attempts to group nearby performance notes with score chords using timing limits
 
 ## Decision Sequence Leading to Failure
 {context_summary}
@@ -114,11 +114,11 @@ Analyze this failure using the ultra-detailed algorithm data and provide insight
    - Which decision winner (vertical vs horizontal) was chosen incorrectly?
    - What match type classifications affected the final decision?
 
-3. **Performance Timing Analysis**: 
-   - Which specific performance timing checks failed for this pitch?
-   - How does the performance IOI (time between consecutive performance notes) compare to algorithm limits?
-   - Is the performance playing faster/slower than expected score tempo?
-   - Are the timing constraint limits appropriate for this musical context and performance tempo?
+3. **Score Row Timing Analysis**: 
+   - Which specific score row timing constraints failed for this pitch?
+   - How long has it been since these score rows last matched a note?
+   - Are the timing constraint limits appropriate for chord grouping in this musical context?
+   - Is the algorithm correctly managing score row timing state?
 
 4. **Algorithm State Investigation**:
    - What was the score competition state when the failure occurred?
@@ -333,36 +333,38 @@ Focus on actionable insights that can guide algorithm improvements.
             sections.append(f"- **Passed checks**: {len(passed_checks)}")
             
             if failed_checks:
-                sections.append("\n**Failed Timing Constraints:**")
+                sections.append("\n**Failed Score Row Timing Constraints:**")
                 for i, check in enumerate(failed_checks[:3]):  # Show first 3
                     check_required_fields = ['ioi', 'limit', 'constraint_type']
                     for field in check_required_fields:
                         if field not in check:
                             raise ValueError(f"Failed timing check {i+1} missing required field '{field}': {check}")
-                    sections.append(f"  {i+1}. IOI: {check['ioi']:.3f}s > Limit: {check['limit']:.3f}s (Type: {check['constraint_type']})")
+                    sections.append(f"  {i+1}. Score Row Gap: {check['ioi']:.3f}s > Limit: {check['limit']:.3f}s (Type: {check['constraint_type']})")
             
-            # Add detailed timing failure analysis with tempo awareness
+            # Add detailed timing failure analysis
             detailed_failures = timing_data.get('detailed_failures', [])
             if detailed_failures:
-                sections.append("\n**Detailed Performance Timing Failures:**")
+                sections.append("\n**Detailed Score Row Timing Failures:**")
                 for i, failure in enumerate(detailed_failures):
-                    performance_ioi = failure.get('performance_ioi', failure.get('ioi', 0))
+                    score_row_gap = failure.get('score_row_gap', failure.get('ioi', 0))
                     timing_limit = failure.get('timing_limit', failure.get('limit', 0))
                     excess_ms = failure.get('excess_ms', 0)
-                    tempo_ratio = failure.get('tempo_ratio', 'unknown')
-                    tempo_context = failure.get('tempo_context', {})
+                    prev_time = failure.get('prev_time', -1)
+                    score_context = failure.get('score_timing_context', {})
                     
-                    sections.append(f"  {i+1}. Performance IOI: {performance_ioi:.3f}s > Algorithm Limit: {timing_limit:.3f}s")
-                    sections.append(f"      Excess: {excess_ms:.1f}ms | Constraint: {failure['constraint_type']} | Time: {failure['time']:.3f}s")
+                    sections.append(f"  {i+1}. Score Row Gap: {score_row_gap:.3f}s > Timing Limit: {timing_limit:.3f}s")
+                    sections.append(f"      Excess: {excess_ms:.1f}ms | Constraint: {failure['constraint_type']} | Current Time: {failure['time']:.3f}s")
                     
-                    # Handle invalid timing data
-                    if tempo_ratio == 'invalid' or 'Invalid timing data' in tempo_context.get('tempo_interpretation', ''):
-                        sections.append(f"      Timing Status: {tempo_context.get('tempo_interpretation', 'Invalid timing data')}")
-                        if 'note' in tempo_context:
-                            sections.append(f"      Note: {tempo_context['note']}")
-                    elif tempo_ratio != 'unknown':
-                        sections.append(f"      Tempo Analysis: {tempo_context.get('tempo_interpretation', 'Unknown tempo relationship')}")
-                        sections.append(f"      Performance vs Expected Score IOI: {performance_ioi:.3f}s vs {tempo_context.get('expected_score_ioi', 'unknown')}s")
+                    # Explain the timing constraint context
+                    if prev_time < 0:
+                        sections.append(f"      Context: Score row never matched (uninitialized) - cannot group with {failure['constraint_type']} timing")
+                    else:
+                        sections.append(f"      Context: Score row last matched at {prev_time:.3f}s - gap too large for {failure['constraint_type']} grouping")
+                    
+                    if score_context:
+                        interpretation = score_context.get('interpretation', '')
+                        if interpretation:
+                            sections.append(f"      Analysis: {interpretation}")
         
         # Match Type Analysis
         if 'match_type_analysis' not in comprehensive_context:
@@ -409,20 +411,16 @@ Focus on actionable insights that can guide algorithm improvements.
                 for i, calc in enumerate(detailed_calcs):
                     pass_fail = "PASS" if calc['timing_pass'] else "FAIL"
                     excess = f" (+{calc['excess_ms']:.1f}ms)" if calc['excess_ms'] > 0 else ""
-                    performance_ioi = calc.get('performance_ioi', calc.get('ioi', 0))
+                    score_row_gap = calc.get('score_row_gap', calc.get('ioi', 0))
                     timing_limit = calc.get('timing_limit', calc.get('limit', 0))
                     
-                    sections.append(f"  {i+1}. Pitch {calc['pitch']}: Performance IOI {performance_ioi:.3f}s vs Algorithm Limit {timing_limit:.3f}s - {pass_fail}{excess}")
+                    sections.append(f"  {i+1}. Pitch {calc['pitch']}: Score Row Gap {score_row_gap:.3f}s vs Timing Limit {timing_limit:.3f}s - {pass_fail}{excess}")
                     sections.append(f"      Match Type: {calc['match_type']}, Result: {calc['result']:.2f}")
                     
-                    # Add timing status and tempo analysis if available
-                    timing_status = calc.get('timing_status', '')
-                    if 'INVALID' in timing_status:
-                        sections.append(f"      Timing Status: {timing_status}")
-                    else:
-                        tempo_analysis = calc.get('tempo_analysis', {})
-                        if tempo_analysis and 'tempo_interpretation' in tempo_analysis:
-                            sections.append(f"      Tempo Context: {tempo_analysis['tempo_interpretation']}")
+                    # Add interpretation of the score row timing
+                    interpretation = calc.get('interpretation', '')
+                    if interpretation:
+                        sections.append(f"      Analysis: {interpretation}")
         
         # Vertical Rule Analysis
         if 'vertical_rule_analysis' in comprehensive_context:
