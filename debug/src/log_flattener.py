@@ -623,10 +623,71 @@ class LogFlattener:
                     for field in explanation_fields:
                         if field in row_dict and (row_dict[field] is None or row_dict[field] == ''):
                             row_dict[field] = 'na'
+                        elif field in row_dict and row_dict[field] != 'na':
+                            # Sort pitch lists within explanation text (e.g., "Expected: [70,74,78]")
+                            row_dict[field] = self._sort_pitch_lists_in_text(str(row_dict[field]))
+                    
+                    # Sort pitch lists in ascending order
+                    pitch_list_fields = [
+                        'cevent_pitches_str', 'cell_used_pitches', 'dp_used_pitches',
+                        'ornament_trill_pitches', 'ornament_grace_pitches', 'ornament_ignore_pitches',
+                        'ornament_trill_pitches_str', 'ornament_grace_pitches_str', 'ornament_ignore_pitches_str'
+                    ]
+                    for field in pitch_list_fields:
+                        if field in row_dict and row_dict[field]:
+                            row_dict[field] = self._sort_pitch_list_string(str(row_dict[field]))
                     
                     writer.writerow(row_dict)
         
         logger.info(f"CSV file written successfully")
+    
+    def _sort_pitch_list_string(self, pitch_str: str) -> str:
+        """Parse and sort a pitch list string like '[60,64,67]' or '60,64,67'."""
+        if not pitch_str or pitch_str == 'na' or pitch_str.strip() == '':
+            return pitch_str
+            
+        try:
+            # Remove brackets and split by comma
+            clean_str = pitch_str.strip('[]')
+            if not clean_str:
+                return pitch_str
+                
+            # Parse pitches as integers and sort
+            pitches = [int(p.strip()) for p in clean_str.split(',') if p.strip()]
+            if not pitches:
+                return pitch_str
+                
+            # Sort and format back
+            sorted_pitches = sorted(pitches)
+            
+            # Return in same format as input (with or without brackets)
+            if pitch_str.strip().startswith('['):
+                return '[' + ','.join(map(str, sorted_pitches)) + ']'
+            else:
+                return ','.join(map(str, sorted_pitches))
+                
+        except (ValueError, AttributeError):
+            # If parsing fails, return original string
+            return pitch_str
+    
+    def _sort_pitch_lists_in_text(self, text: str) -> str:
+        """Sort pitch lists within explanation text like 'Expected: [70,74,78,82,58,62,66]'."""
+        if not text or text == 'na':
+            return text
+            
+        import re
+        
+        # Find all pitch list patterns like [70,74,78] or [70, 74, 78]
+        def sort_match(match):
+            pitch_list = match.group(0)
+            return self._sort_pitch_list_string(pitch_list)
+        
+        # Replace all pitch list patterns with sorted versions
+        # Pattern matches [digits,digits,digits] with optional spaces
+        pattern = r'\[[\d,\s]+\]'
+        sorted_text = re.sub(pattern, sort_match, text)
+        
+        return sorted_text
     
     def analyze_patterns(self, entries: List[FlattenedLogEntry]) -> Dict[str, Any]:
         """Analyze patterns in the flattened data."""

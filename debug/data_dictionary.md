@@ -1,12 +1,106 @@
-# Score Following Debug Log Data Dictionary
+# Score Following Debug Data Dictionary
 
-This document describes all the log entry types and their fields in the score following algorithm debug logs.
+This document describes the complete data structure used in the score following algorithm debug system, including raw log formats and the flattened CSV output structure.
 
-## Log Entry Format
+## Overview
 
-All log entries follow the format: `LOG_TYPE|field1:value1|field2:value2|...`
+The debug system captures detailed algorithm execution logs and flattens them into a comprehensive CSV format for AI-powered analysis. Each CSV row represents one dynamic programming (DP) cell calculation with complete context.
 
-## Basic Algorithm Log Types
+## Raw Log Entry Format
+
+All raw log entries follow the format: `LOG_TYPE|field1:value1|field2:value2|...`
+
+## Flattened CSV Output Structure
+
+The log flattener processes raw logs into a comprehensive CSV with 90+ columns organized into logical sections. Each row represents one DP cell calculation triggered by a performance note input.
+
+### CSV Field Organization
+
+The CSV fields are organized into 6 main sections for optimal analysis workflow:
+
+#### SECTION 1: INPUT CONTEXT & OUTCOME (Most Important)
+**What performance note triggered this and what was the result?**
+
+| Column | Field | Type | Description |
+|--------|-------|------|-------------|
+| 1-3 | `input_column`, `input_pitch`, `input_perf_time` | int, int, float | Performance note that triggered this DP calculation |
+| 4-7 | `match_row`, `match_pitch`, `match_perf_time`, `match_score` | int, int, float, float | Match details (only populated if successful) |
+| 8-9 | `no_match_pitch`, `no_match_perf_time` | int, float | No-match details (only populated if failed) |
+| 10 | `result_type` | string | Final classification: "match", "no_match", or "unprocessed" |
+| 11-15 | `match_explanation`, `no_match_explanation`, `decision_explanation`, `timing_explanation`, `ornament_explanation` | string | **Human-readable final decision explanations with source line numbers** |
+
+#### SECTION 2: ALGORITHM STATE 
+**Current DP state and target**
+
+| Column Range | Field Group | Description |
+|--------------|-------------|-------------|
+| 16-22 | `matrix_*` | DP window state (start, end, center, bases, bounds) |
+| 23-29 | `cevent_*` | Target score event details (time, pitches, ornaments) |
+| 30-34 | `cell_*` | Previous DP cell state (starting point) |
+
+#### SECTION 3: DP COMPUTATION
+**Core algorithm execution**
+
+| Column Range | Field Group | Description |
+|--------------|-------------|-------------|
+| 35-38 | `vrule_*` | Vertical rule (skip score event) calculation |
+| 39-45 | `timing_*` | Timing constraint validation |
+| 46-51 | `hrule_*` | Horizontal rule (match performance note) calculation |
+| 52-57 | `decision_*` | Final DP cell decision (vrule vs hrule winner) |
+
+#### SECTION 4: MUSICAL ANALYSIS
+**Musical context and ornament processing**
+
+| Column Range | Field Group | Description |
+|--------------|-------------|-------------|
+| 58-65 | `matchtype_*` | Musical classification (chord, trill, grace, extra note) |
+| 66-70 | `ornament_*` | Ornament processing details and credits |
+| 71-73 | `ornament_*_str` | **Sorted pitch lists** for ornaments |
+
+#### SECTION 5: ALGORITHM RESULT
+**Final DP computation and outcomes**
+
+| Column Range | Field Group | Description |
+|--------------|-------------|-------------|
+| 74-80 | `dp_*` | Summary of DP computation for this cell |
+| 81-85 | `score_*` | Global score competition and confidence |
+
+#### SECTION 6: DEBUGGING CONTEXT
+**Analysis and diagnostics**
+
+| Column Range | Field Group | Description |
+|--------------|-------------|-------------|
+| 86-88 | `array_*` | DP matrix neighborhood values |
+| 89-90 | `bug_*` | Algorithm bug detection (timing initialization bug) |
+
+### Key Features of CSV Output
+
+#### 1. **Final Decision Explanations (NEW)**
+Every input note has exactly one explanation showing the final decision:
+- **match_explanation**: "Pitch 74 matched: FINAL DECISION (line 1733): Pitch 74 MATCHED at score row 1 | Alignment score: 2 | first_note | Expected: [74] (score=2, timing=2.00454, context=FINAL_MATCH at line 1733: Row=1 | Expected=[74] | Score=2, source_line=1733)"
+- **no_match_explanation**: "Pitch 80 no match: FINAL DECISION (line 1743): Pitch 80 NO MATCH | Search window exhausted | Window=[500-520],Center=510 | Expected: [58,62,66,70,74,78,82] (constraint=search_exhausted, timing=51.2708, expected=FINAL_NO_MATCH at line 1743: Window=[500-520],Center=510 | Expected=[58,62,66,70,74,78,82], source_line=1743)"
+
+#### 2. **Sorted Pitch Lists (NEW)**
+All pitch lists are automatically sorted in ascending order:
+- **cevent_pitches_str**: `[58,62,66,70,74,78,82]` (was `[70,74,78,82,58,62,66]`)
+- **dp_used_pitches**: `[60,64,67]` (sorted)
+- **ornament pitch fields**: All sorted for consistency
+- **Pitch lists in explanations**: Also sorted automatically
+
+#### 3. **"na" for Empty Fields (NEW)**
+Empty explanation fields show "na" instead of blanks for cleaner analysis:
+- Entries with matches: `match_explanation="Pitch 74 matched..."`, `no_match_explanation="na"`
+- Entries with no matches: `match_explanation="na"`, `no_match_explanation="Pitch 80 no match..."`
+
+#### 4. **Complete Context Per Row**
+Each row contains everything needed to understand one DP decision:
+- Input that triggered it
+- Algorithm state when it happened  
+- All intermediate calculations
+- Final decision and reasoning
+- Musical context and constraints
+
+## Raw Algorithm Log Types
 
 ### DP (Dynamic Programming Decision)
 Records each cell calculation in the dynamic programming matrix.
@@ -294,8 +388,81 @@ When `prev_cell_time` is `-1`, IOI calculations become invalid:
 4. **Performance Focus**: Algorithm processes performance notes sequentially
 5. **Matrix Coordinates**: (row, column) = (score_event, performance_note)
 
+## Human-Readable Explanation Log Types (NEW)
+
+### MATCH_EXPLAIN (Final Match Decision)
+Records the final decision when a performance note successfully matches a score position.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pitch` | int | Performance pitch that was matched |
+| `reason` | string | Complete explanation of why this was a match |
+| `score` | float | Algorithm confidence score |
+| `timing` | float | Performance time when match occurred |
+| `context` | string | Additional context about the match |
+| `source_line` | int | Source code line number where decision was made (1733) |
+
+**Example:** `MATCH_EXPLAIN|pitch:74|reason:FINAL DECISION (line 1733): Pitch 74 MATCHED at score row 1 | Alignment score: 2 | first_note | Expected: [74]|score:2|timing:2.00454|context:FINAL_MATCH at line 1733: Row=1 | Expected=[74] | Score=2|source_line:1733`
+
+### NO_MATCH_EXPLAIN (Final No-Match Decision) 
+Records the final decision when a performance note cannot be matched to any score position.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pitch` | int | Performance pitch that failed to match |
+| `reason` | string | Complete explanation of why no match was found |
+| `constraint` | string | Type of constraint that prevented matching |
+| `timing` | float | Performance time when match failed |
+| `expected` | string | What the algorithm was expecting to find |
+| `source_line` | int | Source code line number where decision was made (1743) |
+
+**Example:** `NO_MATCH_EXPLAIN|pitch:80|reason:FINAL DECISION (line 1743): Pitch 80 NO MATCH | Search window exhausted | Window=[500-520],Center=510 | Expected: [70,74,78,82,58,62,66]|constraint:search_exhausted|timing:51.2708|expected:FINAL_NO_MATCH at line 1743: Window=[500-520],Center=510 | Expected=[70,74,78,82,58,62,66]|source_line:1743`
+
+## Processing Enhancements (NEW)
+
+### Pitch List Sorting
+All pitch lists in the output are automatically sorted in ascending order for consistency:
+- **Raw format**: `[70,74,78,82,58,62,66]`
+- **Processed format**: `[58,62,66,70,74,78,82]`
+
+This applies to:
+- `cevent_pitches_str`: Score event chord pitches
+- `dp_used_pitches`: Already matched pitches  
+- `cell_used_pitches`: Cell state pitches
+- `ornament_*_pitches_str`: Ornament pitch lists
+- **Pitch lists within explanation text**: Also automatically sorted
+
+### Empty Field Handling
+Empty explanation fields are replaced with "na" for cleaner analysis:
+- Prevents confusion between empty strings and null values
+- Makes it clear when explanations are not available
+- Improves consistency for AI analysis
+
+### Input Block Processing
+The system processes logs in input blocks:
+1. **INPUT** line starts a new block
+2. All **DP**, **MATRIX**, **TIMING**, etc. lines are collected
+3. **MATCH/NO_MATCH** line indicates end of processing
+4. **MATCH_EXPLAIN/NO_MATCH_EXPLAIN** provides final explanation
+5. Block is converted to multiple CSV rows (one per DP cell)
+
 ## Analysis Recommendations
 
+### CSV Analysis Workflow
+1. **Start with SECTION 1** (columns 1-15): Understand input and outcome
+2. **Check explanation fields** (columns 11-15): Get human-readable reasoning
+3. **Examine timing constraints** (columns 39-45): Debug timing failures  
+4. **Review musical classification** (columns 58-65): Understand match types
+5. **Validate with DP computation** (columns 35-57): Verify algorithm logic
+
+### Common Analysis Patterns
+- **Filter by result_type**: Focus on "match" or "no_match" entries
+- **Group by input_column**: See all DP cells for one performance note
+- **Sort by input_perf_time**: Follow chronological performance order
+- **Search explanation fields**: Find specific failure patterns
+- **Check bug_has_timing_bug**: Identify systematic algorithm issues
+
+### Raw Log Analysis (Advanced)
 - Use `DP` entries for main algorithm flow
 - Use `TIMING` entries to debug timing constraints
 - Use `MATCH_TYPE` entries to understand classification issues
