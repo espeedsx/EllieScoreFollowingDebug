@@ -13,7 +13,7 @@ from config import LOGS_DIR, ANALYSIS_DIR, REPORTS_DIR
 from utils import setup_logging, find_latest_log, get_timestamp, format_duration
 from run_debug_test import TestExecutor
 from log_parser import parse_log_file
-from failure_analyzer import analyze_log_file, FailureAnalyzer
+from failure_analyzer import analyze_log_file, FailureAnalyzer, FailureContext
 from ai_analyzer import AIAnalyzer, analyze_with_ai_prompt
 
 
@@ -115,13 +115,18 @@ class DebugWorkflow:
     
     def _parse_log(self, log_file: Path) -> Dict[str, Any]:
         """Parse log file into structured data."""
-        logger.info("Step 2: Parsing debug log")
+        logger.info("Step 2: Parsing debug log (smart mode - comprehensive data only around failures)")
         
-        parsed_data = parse_log_file(log_file, save_analysis=True)
+        # Smart parsing: core data + comprehensive data only around failure points (±50 lines)
+        parsed_data = parse_log_file(log_file, save_analysis=True, parse_comprehensive=False, failure_context_lines=50)
+        
+        # Validate analysis file was created
+        if 'analysis_file' not in parsed_data['metadata']:
+            raise RuntimeError("Parsing metadata missing analysis_file - log parsing may have failed")
         
         self.results['parsing'] = {
             'log_file': str(log_file),
-            'analysis_file': parsed_data['metadata'].get('analysis_file'),
+            'analysis_file': parsed_data['metadata']['analysis_file'],
             'metrics': parsed_data['metadata']['metrics'],
             'summary': parsed_data['summary']
         }
@@ -133,12 +138,24 @@ class DebugWorkflow:
         """Analyze failures in parsed data."""
         logger.info("Step 3: Analyzing failures")
         
+        if 'comprehensive_data' not in parsed_data:
+            raise RuntimeError("Parsed data missing comprehensive_data key - parsing may have failed")
+        if not parsed_data['comprehensive_data']:
+            raise RuntimeError("Parsed data has empty comprehensive_data - parsing may have failed")
+        
         analyzer = FailureAnalyzer(parsed_data)
         failure_report = analyzer.analyze()
         
+        if not failure_report.failure_contexts:
+            raise RuntimeError("No failure contexts found - test may have passed or analysis failed")
+        
+        # Validate failure analysis results
+        if 'failure_type_distribution' not in failure_report.summary_statistics:
+            raise RuntimeError("Failure analysis missing failure_type_distribution - analysis may have failed")
+        
         self.results['failure_analysis'] = {
             'total_failures': failure_report.total_failures,
-            'failure_types': failure_report.summary_statistics.get('failure_type_distribution', {}),
+            'failure_types': failure_report.summary_statistics['failure_type_distribution'],
             'recommendations': failure_report.recommendations,
             'most_critical': analyzer.get_most_critical_failure()
         }
@@ -155,27 +172,34 @@ class DebugWorkflow:
         
         analyzer = AIAnalyzer(failure_report)
         
-        # Get most critical failure for focused analysis (prioritize no_match failures)
-        if parsed_data:
-            analyzer_instance = FailureAnalyzer(parsed_data)
-            focus_context = analyzer_instance.get_most_critical_failure(score_time)
-        else:
-            # Fallback to earliest failure if no parsed data available
-            focus_context = None
-            if failure_report.failure_contexts:
-                candidate_failures = failure_report.failure_contexts
-                if score_time is not None:
-                    candidate_failures = [fc for fc in failure_report.failure_contexts if fc.failure_time >= score_time]
-                    if not candidate_failures:
-                        logger.info(f"No failures found after score time {score_time:.3f}s")
-                    else:
-                        logger.info(f"Filtering to {len(candidate_failures)} failures after score time {score_time:.3f}s")
-                
-                if candidate_failures:
-                    focus_context = min(candidate_failures, key=lambda fc: fc.failure_time)
+        # Get most critical failure from existing failure contexts (no redundant analysis)
+        focus_context = self._get_most_critical_failure(failure_report.failure_contexts, score_time)
+        
+        # Strict validation of comprehensive context
+        if not focus_context.comprehensive_context:
+            raise RuntimeError(f"Focus context at {focus_context.failure_time:.3f}s lacks comprehensive data - parsing may have failed")
+        
+        # Validate comprehensive data is meaningful
+        context_keys = list(focus_context.comprehensive_context.keys())
+        expected_keys = ['timing_constraints', 'match_type_analysis', 'horizontal_rule_analysis', 
+                        'cell_decisions', 'score_competition', 'ornament_context', 'algorithmic_insights']
+        missing_keys = set(expected_keys) - set(context_keys)
+        if missing_keys:
+            raise RuntimeError(f"Comprehensive context missing expected keys: {missing_keys}")
+        
+        logger.info(f"Focus context has valid comprehensive data with all expected keys")
+        
+        # Prepare filtered failures for general analysis if needed
+        filtered_failures = None
+        if score_time is not None:
+            filtered_failures = [fc for fc in failure_report.failure_contexts if fc.failure_time >= score_time]
+            # Note: we already validated focus_context exists above, so this should have data
+            if not filtered_failures:
+                raise RuntimeError(f"Logic error: focus_context exists but no filtered failures found after {score_time:.3f}s")
+            logger.info(f"Using {len(filtered_failures)} failures after score time {score_time:.3f}s")
         
         # Generate prompt
-        prompt = analyzer.generate_analysis_prompt(focus_context)
+        prompt = analyzer.generate_analysis_prompt(focus_context, filtered_failures)
         
         # Create report (with or without AI insights)
         if ai_insights:
@@ -239,6 +263,33 @@ class DebugWorkflow:
             summary['ai_insights_included'] = ai_res['insights_provided']
         
         return summary
+
+    def _get_most_critical_failure(self, failure_contexts: list, after_score_time: Optional[float] = None) -> FailureContext:
+        """Get the most critical failure from existing failure contexts."""
+        if not failure_contexts:
+            raise ValueError("No failure contexts provided - cannot analyze without failures")
+        
+        # Filter by score time if specified
+        candidate_failures = failure_contexts
+        if after_score_time is not None:
+            candidate_failures = [fc for fc in failure_contexts if fc.failure_time >= after_score_time]
+            if not candidate_failures:
+                raise ValueError(f"No failures found after score time {after_score_time:.3f}s - adjust score_time parameter")
+            logger.info(f"Filtering to {len(candidate_failures)} failures after score time {after_score_time:.3f}s")
+        
+        # Focus primarily on no_match failures (unmatched notes)
+        priority_order = ['no_match', 'wrong_match', 'score_drop']
+        
+        for failure_type in priority_order:
+            failures_of_type = [fc for fc in candidate_failures if fc.failure_type == failure_type]
+            if failures_of_type:
+                # Return the first one (earliest in time)
+                selected = min(failures_of_type, key=lambda fc: fc.failure_time)
+                logger.info(f"Selected {failure_type} failure at {selected.failure_time:.3f}s, pitch {selected.failure_pitch}")
+                return selected
+        
+        # Should never reach here if failure analysis is working correctly
+        raise RuntimeError(f"No failures found with expected types {priority_order} - failure analysis may be broken")
 
 
 def run_workflow(test_case_id: int, **kwargs) -> Dict[str, Any]:

@@ -54,6 +54,77 @@ def log_dp_decision(col, row, pitch, time, vert_rule, horiz_rule, final_val, mat
                      "]|uc:" + str(unused_count)
         debug_log(message)
 
+// Ultra-comprehensive algorithm logging functions (controlled by LOG_DEBUG / -d flag)
+
+def log_input_event(col, pitch, time):
+    if LOG_DEBUG:
+        debug_log("INPUT|c:" + str(col) + "|p:" + str(pitch) + "|t:" + str(time))
+
+def log_matrix_state(col, win_start, win_end, win_center, cur_base, prev_base, cur_upper, prev_upper):
+    if LOG_DEBUG:
+        debug_log("MATRIX|c:" + str(col) + "|ws:" + str(win_start) + "|we:" + str(win_end) + 
+                 "|wc:" + str(win_center) + "|cb:" + str(cur_base) + "|pb:" + str(prev_base) + 
+                 "|cu:" + str(cur_upper) + "|pu:" + str(prev_upper))
+
+def log_cell_state(row, value, used, unused_count, time):
+    if LOG_DEBUG:
+        var used_str = format_pitches_compact(used)
+        debug_log("CELL|r:" + str(row) + "|v:" + str(value) + "|u:[" + used_str + "]|uc:" + str(unused_count) + "|t:" + str(time))
+
+def log_vertical_rule(row, up_value, penalty, result, start_point_check):
+    if LOG_DEBUG:
+        debug_log("VRULE|r:" + str(row) + "|up:" + str(up_value) + "|pen:" + str(penalty) + 
+                 "|res:" + str(result) + "|sp:" + str(start_point_check))
+
+def log_horizontal_rule(row, prev_value, pitch, ioi, limit, timing_pass, match_type, result):
+    if LOG_DEBUG:
+        debug_log("HRULE|r:" + str(row) + "|pv:" + str(prev_value) + "|pit:" + str(pitch) + 
+                 "|ioi:" + str(ioi) + "|lim:" + str(limit) + "|pass:" + str(timing_pass) + 
+                 "|typ:" + str(match_type) + "|res:" + str(result))
+
+def log_timing_check(prev_time, curr_time, ioi, span, limit, timing_pass, constraint_type):
+    if LOG_DEBUG:
+        debug_log("TIMING|pt:" + str(prev_time) + "|ct:" + str(curr_time) + "|ioi:" + str(ioi) + 
+                 "|span:" + str(span) + "|lim:" + str(limit) + "|pass:" + str(timing_pass) + 
+                 "|type:" + str(constraint_type))
+
+def log_match_type_analysis(pitch, is_chord, is_trill, is_grace, is_extra, is_ignored, already_used, timing_ok, ornament_info):
+    if LOG_DEBUG:
+        debug_log("MATCH_TYPE|pit:" + str(pitch) + "|ch:" + str(is_chord) + "|tr:" + str(is_trill) + 
+                 "|gr:" + str(is_grace) + "|ex:" + str(is_extra) + "|ign:" + str(is_ignored) + 
+                 "|used:" + str(already_used) + "|time:" + str(timing_ok) + "|orn:" + str(ornament_info))
+
+def log_cell_decision(row, vert_result, horiz_result, winner, updated, final_value, reason):
+    if LOG_DEBUG:
+        debug_log("DECISION|r:" + str(row) + "|vr:" + str(vert_result) + "|hr:" + str(horiz_result) + 
+                 "|win:" + str(winner) + "|upd:" + str(updated) + "|val:" + str(final_value) + "|reason:" + str(reason))
+
+def log_array_neighborhood(row, center_value, neighbors, positions):
+    if LOG_DEBUG:
+        var vals_str = ""
+        for i = 0 to len(neighbors):
+            if i > 0: vals_str = vals_str + ","
+            vals_str = vals_str + str(neighbors[i])
+        debug_log("ARRAY|r:" + str(row) + "|center:" + str(center_value) + "|vals:[" + vals_str + "]|pos:" + str(positions))
+
+def log_score_competition(row, current_score, top_score, beats_top, margin, confidence):
+    if LOG_DEBUG:
+        debug_log("SCORE|r:" + str(row) + "|cur:" + str(current_score) + "|top:" + str(top_score) + 
+                 "|beat:" + str(beats_top) + "|margin:" + str(margin) + "|conf:" + str(confidence))
+
+def log_ornament_processing(pitch, orn_type, trill_pitches, grace_pitches, ignore_pitches, credit_applied):
+    if LOG_DEBUG:
+        var tr_str = format_pitches_compact(trill_pitches if trill_pitches else [])
+        var gr_str = format_pitches_compact(grace_pitches if grace_pitches else [])
+        var ig_str = format_pitches_compact(ignore_pitches if ignore_pitches else [])
+        debug_log("ORNAMENT|pit:" + str(pitch) + "|type:" + str(orn_type) + "|tr:[" + tr_str + 
+                 "]|gr:[" + gr_str + "]|ig:[" + ig_str + "]|credit:" + str(credit_applied))
+
+def log_window_movement(old_center, new_center, old_start, new_start, old_end, new_end, reason):
+    if LOG_DEBUG:
+        debug_log("WINDOW_MOVE|oc:" + str(old_center) + "|nc:" + str(new_center) + "|os:" + str(old_start) + 
+                 "|ns:" + str(new_start) + "|oe:" + str(old_end) + "|ne:" + str(new_end) + "|reason:" + str(reason))
+
 def init_debug_log():
     if LOG_DEBUG:
         var debug_path = getenv("DEBUG_LOG_FILE")
@@ -1282,9 +1353,16 @@ class Score_follower:
         if LOG1 == true:
             display "<<< dynamic_match()", time, pitch, result
 
+        // Ultra-comprehensive logging: Log input event and initial matrix state
+        log_input_event(input_count, pitch, time)
+        
         var mm = match_mat
         mm.curbase = mm.win_start - 1  // position window properly
         result.match_stime = -1  // no match
+
+        // Log complete matrix state before processing
+        log_matrix_state(input_count, mm.win_start, mm.win_end, mm.win_center, 
+                        mm.curbase, mm.prevbase, mm.cur_upper_bound, mm.prev_upper_bound)
 
         mm.got_input(pitch)  // for debugging
 
@@ -1303,19 +1381,29 @@ class Score_follower:
             var cur = mm.curcol(rk)
             var curup = mm.curcol(rk - 1)  // previous row of current column
 
+            // Log initial cell state before processing
+            log_cell_state(rk, cur.value, cur.used, cur.unused_count, cur.time)
+
             if LOG2:
                 display " row", rk, cur
                 display "    ", curup
 
-            if rk > match_mat.start_point:
+            var vertical_penalty = 0
+            var start_point_check = rk > match_mat.start_point
+            if start_point_check:
                 // display "vertical", rk, pitch, curup.value, curup.unused_count
-                cur.value = curup.value - dcm * curup.unused_count
+                vertical_penalty = dcm * curup.unused_count
+                cur.value = curup.value - vertical_penalty
             else:
                 cur.value = curup.value
 
             var cur_cevt = ref_track[rk - 1]
             cur.used.clear()
             cur.unused_count = cur_cevt.expected
+            
+            // Log detailed vertical rule calculation
+            log_vertical_rule(rk, curup.value, vertical_penalty, cur.value, start_point_check)
+            
             if LOG2:
                 display "  after vertical rule", cur, cur.unused_count,
                 display     cur_cevt, cur_cevt.expected
@@ -1337,6 +1425,13 @@ class Score_follower:
             if LOG2:
                 display "    ", prev
 
+            // Log previous cell selection and basic timing
+            var ioi = time - prev.time
+            var timing_span = cur_cevt.time_span
+            var is_in_window = (rk >= mm.prevbase and rk < mm.prev_upper_bound)
+            log_timing_check(prev.time, time, ioi, timing_span, timing_span + 0.1, 
+                           (ioi < timing_span + 0.1), "chord_basic")
+
             // the horizontal rule has multiple cases, any of which could 
             // result in updating cur, but the update is conditioned on
             // getting a higher score than already produced by the vertical
@@ -1350,34 +1445,54 @@ class Score_follower:
             var new_time = time  // last match time to put in cur (Cell)
             var report = false  // do not report trill and grace notes
             // because their time is not correct; only report chord notes
-            if ((pitch in cur_cevt.pitches) and (pitch not in prev.used) and
-                ((len(prev.used) == 0) or
-                 // case 1: only grace notes have been played,
-                 //     so allowed time interval is larger:
-                 (time - prev.time < grace_max_ioi if 
-                      prev_unused_count == cur_cevt.expected
-                  else (time - prev.time < cur_cevt.time_span + 0.1)))):
+            
+            // Initialize match type analysis variables
+            var is_chord = (pitch in cur_cevt.pitches)
+            var is_trill = (cur_cevt.ornaments and cur_cevt.ornaments.trill_pitches and 
+                          (pitch in cur_cevt.ornaments.trill_pitches))
+            var is_grace = (cur_cevt.ornaments and cur_cevt.ornaments.grace_pitches and 
+                          (pitch in cur_cevt.ornaments.grace_pitches))
+            var already_used = (pitch in prev.used)
+            var match_type = "none"
+            var timing_limit = (grace_max_ioi if prev_unused_count == cur_cevt.expected 
+                              else cur_cevt.time_span + 0.1)
+            var timing_ok = ((len(prev.used) == 0) or (time - prev.time < timing_limit))
+            var chord_match_possible = ((pitch in cur_cevt.pitches) and (pitch not in prev.used) and timing_ok)
+            
+            if chord_match_possible:
+                match_type = "chord"
                 // display "dynmatch", pitch, rk, ref_track[rk - 1].pitches,
                 // display     time, prev.time, prev.used, mm.prevbase
                 // v is already correctly set to prev.value + dmc
                 var orn = cur_cevt.ornaments
-                if orn and orn.ignore_pitches and (pitch in orn.ignore_pitches):
+                var is_ignored = (orn and orn.ignore_pitches and (pitch in orn.ignore_pitches))
+                if is_ignored:
                     v = prev.value
+                    match_type = "chord_ignored"
                     // does not decrement expected, used == 0
                 else:
                     report = true
                     used = 1
+                    match_type = "chord_matched"
                 match = true
                 // new_time is already correct
+                
+                // Log chord match analysis
+                log_timing_check(prev.time, time, ioi, timing_span, timing_limit, timing_ok, "chord")
+                log_ornament_processing(pitch, match_type, nil, nil, 
+                                      (orn.ignore_pitches if orn else nil), (dmc if not is_ignored else 0))
             elif (cur_cevt.ornaments and cur_cevt.ornaments.trill_pitches and
                   (pitch in cur_cevt.ornaments.trill_pitches) and
                   ((len(prev.used) == 0) or
                    (time - prev.time < trill_max_ioi))):
-                  if (pitch in prev.used) or
-                     (cur_cevt.ornaments and
-                      cur_cevt.ornaments.ignore_pitches and
-                      (pitch in cur_cevt.ornaments.ignore_pitches)):
+                  var trill_timing_ok = ((len(prev.used) == 0) or (time - prev.time < trill_max_ioi))
+                  var trill_already_used = (pitch in prev.used)
+                  var trill_ignored = (cur_cevt.ornaments and cur_cevt.ornaments.ignore_pitches and
+                                     (pitch in cur_cevt.ornaments.ignore_pitches))
+                  
+                  if trill_already_used or trill_ignored:
                       v = prev.value  // no credit after note is used
+                      match_type = "trill_repeated" if trill_already_used else "trill_ignored"
                       // display "horiz match on trill", rk, cur_cevt.time, time,
                       // display     pitch, v, top_score
                       // match is already false
@@ -1389,32 +1504,58 @@ class Score_follower:
                       // display     pitch, v, top_score
                       match = true
                       used = 1
+                      match_type = "trill_matched"
                       // new_time is already time
+                      
+                  // Log trill match analysis
+                  log_timing_check(prev.time, time, ioi, 0, trill_max_ioi, trill_timing_ok, "trill")
+                  log_ornament_processing(pitch, match_type, cur_cevt.ornaments.trill_pitches, nil,
+                                        (cur_cevt.ornaments.ignore_pitches if cur_cevt.ornaments else nil),
+                                        (dmc if (not trill_already_used and not trill_ignored) else 0))
             elif (cur_cevt.ornaments and (pitch not in cur.used) and
                   cur_cevt.ornaments.grace_pitches and 
                   (pitch in cur_cevt.ornaments.grace_pitches) and
                   ((len(prev.used) == 0) or
                    (time - prev.time < grace_max_ioi))):
+                var grace_timing_ok = ((len(prev.used) == 0) or (time - prev.time < grace_max_ioi))
                 var beyond_grace_notes = nil
                 for p in prev.used:
                     if p not in cur_cevt.ornaments.grace_pitches:
                         beyond_grace_notes = true
+                        
                 if beyond_grace_notes:  // same as else clause: no match
                     v = prev.value - dce
                     new_time = prev.time
+                    match_type = "grace_after_chord"
                 else:
                     v = prev.value + dgc  // grace match credit
                     match = true  // need to add pitch to used
+                    match_type = "grace_matched"
                     // used is already 0 -- grace notes are not in unused_count
+                    
+                // Log grace note analysis
+                log_timing_check(prev.time, time, ioi, 0, grace_max_ioi, grace_timing_ok, "grace")
+                log_ornament_processing(pitch, match_type, nil, cur_cevt.ornaments.grace_pitches, nil,
+                                      (dgc if not beyond_grace_notes else -dce))
             else:
                 v = prev.value - dce  // pay cost of extra note
+                match_type = "extra_note"
                 // match is already false
                 // used is already 0
                 new_time = prev.time  // chord time is unchanged
                 
+            // Log comprehensive match type analysis before decision  
+            var is_ignored_type = (match_type == "ignored_note" or match_type == "repeated_note")
+            log_match_type_analysis(pitch, is_chord, is_trill, is_grace, (match_type == "extra_note"), 
+                                  is_ignored_type, already_used, timing_ok, match_type)
+            
             // now we decide whether to apply the horizontal rule
             var vertical_value = cur.value  // save vertical rule value for logging
-            if v > cur.value:
+            var horizontal_wins = (v > cur.value)
+            var winner = "vertical" if not horizontal_wins else "horizontal"
+            var cell_updated = horizontal_wins
+            
+            if horizontal_wins:
                 cur.value = v
                 cur.used = prev.used.copy()
                 cur.unused_count = prev_unused_count - used
@@ -1422,12 +1563,38 @@ class Score_follower:
                 if match:
                     cur.used.append(pitch)
             
-            // Log this DP decision in compact format
+            // Log detailed cell decision
+            log_cell_decision(rk, vertical_value, v, winner, cell_updated, cur.value, match_type)
+            
+            // Log detailed horizontal rule analysis
+            log_horizontal_rule(rk, prev.value, pitch, ioi, timing_limit, timing_ok, match_type, v)
+            
+            // Log this DP decision in compact format (preserve existing)
             log_dp_decision(input_count, rk, pitch, time, vertical_value, v, 
                            cur.value, report and cur.value > top_score, cur.used, cur.unused_count)
 
             // if LOG2 == true:
             //    display "  match score", rk, cur.value, top_score
+
+            // Log DP array neighborhood (capture matrix context around this decision)
+            var neighbors = []
+            var neighbor_positions = []
+            for r_offset = -2 to 3:  // 5-cell window around current row
+                var neighbor_row = rk + r_offset
+                if neighbor_row >= mm.curbase and neighbor_row < mm.cur_upper_bound and (neighbor_row - mm.curbase) < len(mm.cur_col):
+                    var neighbor_cell = mm.curcol(neighbor_row)
+                    neighbors.append(neighbor_cell.value)
+                    neighbor_positions.append(neighbor_row)
+                else:
+                    neighbors.append(SF_NINF)  // out of window
+                    neighbor_positions.append(neighbor_row)
+            log_array_neighborhood(rk, cur.value, neighbors, neighbor_positions)
+            
+            // Log score competition analysis
+            var beats_top_score = (cur.value > top_score)
+            var score_margin = cur.value - top_score
+            var confidence = cur.value / (top_score + 0.001)  // avoid division by zero
+            log_score_competition(rk, cur.value, top_score, beats_top_score, score_margin, confidence)
 
             // is the a reportable match?
             if cur.value > top_score and report:

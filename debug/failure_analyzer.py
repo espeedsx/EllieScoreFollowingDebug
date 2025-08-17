@@ -30,6 +30,9 @@ class FailureContext:
     score_progression: List[float]
     timing_analysis: Dict[str, Any]
     line_number: int
+    
+    # Ultra-comprehensive algorithm context
+    comprehensive_context: Optional[Dict[str, Any]] = None
 
 
 @dataclass 
@@ -53,6 +56,24 @@ class FailureAnalyzer:
         self.matches = [Match(**m) for m in parsed_data['matches']]
         self.no_matches = [NoMatch(**nm) for nm in parsed_data['no_matches']]
         self.metadata = parsed_data['metadata']
+        
+        # Ultra-comprehensive data (required for proper analysis)
+        if 'comprehensive_data' not in parsed_data:
+            raise ValueError("No comprehensive_data key in parsed_data - parsing with comprehensive=True required")
+        self.comprehensive_data = parsed_data['comprehensive_data']
+        if not self.comprehensive_data:
+            raise ValueError("Comprehensive_data is empty - parsing with comprehensive=True required")
+        
+        # Validate comprehensive data has expected structure
+        expected_keys = ['input_events', 'matrix_states', 'cell_states', 'vertical_rules', 
+                        'horizontal_rules', 'timing_checks', 'match_type_analyses', 
+                        'cell_decisions', 'array_neighborhoods', 'score_competitions', 
+                        'ornament_processings', 'window_movements']
+        missing_keys = set(expected_keys) - set(self.comprehensive_data.keys())
+        if missing_keys:
+            raise ValueError(f"Comprehensive data missing expected keys: {missing_keys}")
+        
+        self.has_comprehensive_data = True
     
     def analyze(self) -> FailureReport:
         """
@@ -117,6 +138,11 @@ class FailureAnalyzer:
         # Timing analysis
         timing_analysis = self._analyze_timing_patterns(context_decisions, no_match.time)
         
+        # Extract comprehensive algorithm context (required)
+        comprehensive_context = self._extract_comprehensive_context(no_match.time, no_match.pitch)
+        if not comprehensive_context:
+            raise RuntimeError(f"Failed to extract comprehensive context for failure at {no_match.time:.3f}s, pitch {no_match.pitch}")
+        
         return FailureContext(
             failure_type='no_match',
             failure_time=no_match.time,
@@ -127,7 +153,8 @@ class FailureAnalyzer:
             preceding_matches=[asdict(m) for m in preceding_matches],
             score_progression=score_progression,
             timing_analysis=timing_analysis,
-            line_number=no_match.line_number
+            line_number=no_match.line_number,
+            comprehensive_context=comprehensive_context
         )
     
     def _analyze_potential_wrong_matches(self) -> List[FailureContext]:
@@ -218,22 +245,27 @@ class FailureAnalyzer:
     def _analyze_timing_patterns(self, decisions: List[DPDecision], failure_time: float) -> Dict[str, Any]:
         """Analyze timing patterns around a failure."""
         if len(decisions) < 2:
-            return {}
+            raise ValueError(f"Cannot analyze timing patterns with {len(decisions)} decisions - need at least 2 decisions for timing analysis")
         
         times = [d.time for d in decisions]
         inter_onset_intervals = [times[i] - times[i-1] for i in range(1, len(times))]
         
         # Look for timing irregularities
-        avg_ioi = sum(inter_onset_intervals) / len(inter_onset_intervals) if inter_onset_intervals else 0
+        if not inter_onset_intervals:
+            raise ValueError("No inter-onset intervals calculated - cannot analyze timing patterns")
+        if not times:
+            raise ValueError("No decision times found - cannot analyze timing patterns")
+        
+        avg_ioi = sum(inter_onset_intervals) / len(inter_onset_intervals)
         
         timing_analysis = {
             'decision_count': len(decisions),
-            'time_span': max(times) - min(times) if times else 0,
+            'time_span': max(times) - min(times),
             'average_ioi': avg_ioi,
-            'ioi_variance': sum((ioi - avg_ioi)**2 for ioi in inter_onset_intervals) / len(inter_onset_intervals) if inter_onset_intervals else 0,
-            'max_gap': max(inter_onset_intervals) if inter_onset_intervals else 0,
-            'min_gap': min(inter_onset_intervals) if inter_onset_intervals else 0,
-            'time_to_failure': failure_time - max(times) if times else 0
+            'ioi_variance': sum((ioi - avg_ioi)**2 for ioi in inter_onset_intervals) / len(inter_onset_intervals),
+            'max_gap': max(inter_onset_intervals),
+            'min_gap': min(inter_onset_intervals),
+            'time_to_failure': failure_time - max(times)
         }
         
         # Identify timing issues
@@ -251,7 +283,7 @@ class FailureAnalyzer:
     def _generate_summary_statistics(self, failure_contexts: List[FailureContext]) -> Dict[str, Any]:
         """Generate summary statistics for all failures."""
         if not failure_contexts:
-            return {}
+            raise ValueError("Cannot generate summary statistics - no failure contexts provided")
         
         failure_types = [fc.failure_type for fc in failure_contexts]
         failure_type_counts = {
@@ -260,23 +292,27 @@ class FailureAnalyzer:
         
         # Timing statistics
         failure_times = [fc.failure_time for fc in failure_contexts]
+        if not failure_times:
+            raise ValueError("No failure times found in failure contexts - data corruption")
         
         # Score statistics
         all_scores = []
         for fc in failure_contexts:
             all_scores.extend(fc.score_progression)
+        if not all_scores:
+            raise ValueError("No scores found in failure contexts - score progression data missing")
         
         return {
             'failure_type_distribution': failure_type_counts,
             'temporal_distribution': {
-                'first_failure': min(failure_times) if failure_times else 0,
-                'last_failure': max(failure_times) if failure_times else 0,
+                'first_failure': min(failure_times),
+                'last_failure': max(failure_times),
                 'failure_span': max(failure_times) - min(failure_times) if len(failure_times) > 1 else 0
             },
             'score_statistics': {
-                'min_score': min(all_scores) if all_scores else 0,
-                'max_score': max(all_scores) if all_scores else 0,
-                'avg_score': sum(all_scores) / len(all_scores) if all_scores else 0
+                'min_score': min(all_scores),
+                'max_score': max(all_scores),
+                'avg_score': sum(all_scores) / len(all_scores)
             },
             'context_statistics': {
                 'avg_context_size': sum(len(fc.context_decisions) for fc in failure_contexts) / len(failure_contexts),
@@ -307,7 +343,9 @@ class FailureAnalyzer:
         # Timing-based recommendations
         timing_issues = []
         for fc in failure_contexts:
-            timing_issues.extend(fc.timing_analysis.get('issues', []))
+            if 'issues' not in fc.timing_analysis:
+                raise ValueError(f"Timing analysis for failure context missing issues field: {fc.timing_analysis}")
+            timing_issues.extend(fc.timing_analysis['issues'])
         
         if any('Large timing gap' in issue for issue in timing_issues):
             recommendations.append("Large timing gaps detected - consider increasing tempo tolerance")
@@ -324,23 +362,28 @@ class FailureAnalyzer:
     
     def _get_test_case_id(self) -> int:
         """Extract test case ID from metadata."""
-        test_info = self.metadata.get('test_info')
-        return test_info.get('test_case', 0) if test_info else 0
+        if 'test_info' not in self.metadata:
+            raise ValueError("Metadata missing test_info - cannot extract test case ID")
+        test_info = self.metadata['test_info']
+        if not test_info:
+            raise ValueError("Test info is empty - cannot extract test case ID")
+        if 'test_case' not in test_info:
+            raise ValueError("Test info missing test_case field - cannot extract test case ID")
+        return test_info['test_case']
     
-    def get_most_critical_failure(self, after_score_time: Optional[float] = None) -> Optional[FailureContext]:
+    def get_most_critical_failure(self, after_score_time: Optional[float] = None) -> FailureContext:
         """Get the most critical failure for focused AI analysis."""
         report = self.analyze()
         
         if not report.failure_contexts:
-            return None
+            raise ValueError("No failure contexts found - cannot identify critical failure without failures")
         
         # Filter by score time if specified
         candidate_failures = report.failure_contexts
         if after_score_time is not None:
             candidate_failures = [fc for fc in report.failure_contexts if fc.failure_time >= after_score_time]
             if not candidate_failures:
-                logger.info(f"No failures found after score time {after_score_time:.3f}s")
-                return None
+                raise ValueError(f"No failures found after score time {after_score_time:.3f}s - adjust score_time parameter")
             logger.info(f"Filtering to {len(candidate_failures)} failures after score time {after_score_time:.3f}s")
         
         # Focus primarily on no_match failures (unmatched notes)
@@ -352,8 +395,230 @@ class FailureAnalyzer:
                 # Return the first one (earliest in time)
                 return min(failures_of_type, key=lambda fc: fc.failure_time)
         
-        # Fallback to first failure
-        return candidate_failures[0] if candidate_failures else None
+        # If no failures match priority order, return first available failure
+        if not candidate_failures:
+            raise RuntimeError("Logic error: candidate_failures is empty after validation")
+        return candidate_failures[0]
+    
+    def _extract_comprehensive_context(self, failure_time: float, failure_pitch: int) -> Dict[str, Any]:
+        """Extract comprehensive algorithm context around a failure."""
+        context = {}
+        
+        # Debug: Check if we have comprehensive data
+        logger.debug(f"Extracting comprehensive context for failure at {failure_time:.3f}s, pitch {failure_pitch}")
+        logger.debug(f"Available comprehensive data keys: {list(self.comprehensive_data.keys())}")
+        for key, data in self.comprehensive_data.items():
+            logger.debug(f"  {key}: {len(data)} entries")
+        
+        # Time window for context (±1 second around failure)
+        time_window = 1.0
+        start_time = failure_time - time_window
+        end_time = failure_time + time_window
+        
+        # Extract timing constraints that might have failed (timing checks don't have pitch, filter by time only)
+        if 'timing_checks' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing timing_checks - parsing may have failed")
+        timing_checks = self.comprehensive_data['timing_checks']
+        relevant_timing = []
+        for t in timing_checks:
+            if 'curr_time' not in t:
+                raise RuntimeError(f"Timing check missing curr_time field: {t}")
+            if start_time <= t['curr_time'] <= end_time:
+                relevant_timing.append(t)
+        
+        # Extract match type analyses for this pitch
+        if 'match_type_analyses' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing match_type_analyses - parsing may have failed")
+        match_analyses = self.comprehensive_data['match_type_analyses']
+        relevant_match_types = []
+        for m in match_analyses:
+            if 'pitch' not in m:
+                raise RuntimeError(f"Match type analysis missing pitch field: {m}")
+            if 'line_number' not in m:
+                raise RuntimeError(f"Match type analysis missing line_number field: {m}")
+            if (m['pitch'] == failure_pitch and
+                abs(failure_time - self._find_closest_time_for_pitch(m['line_number'])) <= time_window):
+                relevant_match_types.append(m)
+        
+        # Extract horizontal rule calculations (use 'pitch' field from HRULE entries)
+        if 'horizontal_rules' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing horizontal_rules - parsing may have failed")
+        horizontal_rules = self.comprehensive_data['horizontal_rules']
+        relevant_h_rules = []
+        for h in horizontal_rules:
+            if 'pitch' not in h:
+                raise RuntimeError(f"Horizontal rule missing pitch field: {h}")
+            if h['pitch'] == failure_pitch:
+                relevant_h_rules.append(h)
+        
+        # Extract cell decisions around this time
+        if 'cell_decisions' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing cell_decisions - parsing may have failed")
+        cell_decisions = self.comprehensive_data['cell_decisions']
+        relevant_decisions = []
+        for d in cell_decisions:
+            if 'line_number' not in d:
+                raise RuntimeError(f"Cell decision missing line_number field: {d}")
+            if abs(failure_time - self._find_closest_time_for_decision(d['line_number'])) <= time_window:
+                relevant_decisions.append(d)
+        
+        # Extract score competition data
+        if 'score_competitions' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing score_competitions - parsing may have failed")
+        score_competitions = self.comprehensive_data['score_competitions']
+        relevant_scores = []
+        for s in score_competitions:
+            if 'line_number' not in s:
+                raise RuntimeError(f"Score competition missing line_number field: {s}")
+            if abs(failure_time - self._find_closest_time_for_score(s['line_number'])) <= time_window:
+                relevant_scores.append(s)
+        
+        # Extract ornament processing if relevant
+        if 'ornament_processings' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing ornament_processings - parsing may have failed")
+        ornament_processings = self.comprehensive_data['ornament_processings']
+        relevant_ornaments = []
+        for o in ornament_processings:
+            if 'pitch' not in o:
+                raise RuntimeError(f"Ornament processing missing pitch field: {o}")
+            if 'line_number' not in o:
+                raise RuntimeError(f"Ornament processing missing line_number field: {o}")
+            if (o['pitch'] == failure_pitch and
+                abs(failure_time - self._find_closest_time_for_ornament(o['line_number'])) <= time_window):
+                relevant_ornaments.append(o)
+        
+        # Build comprehensive context with actual data counts for debugging
+        failed_checks = []
+        passed_checks = []
+        for t in relevant_timing:
+            if 'timing_pass' not in t:
+                raise RuntimeError(f"Timing check missing timing_pass field: {t}")
+            if not t['timing_pass']:
+                failed_checks.append(t)
+            else:
+                passed_checks.append(t)
+        
+        context = {
+            'timing_constraints': {
+                'failed_checks': failed_checks,
+                'passed_checks': passed_checks,
+                'total_checks': len(relevant_timing)
+            },
+            'match_type_analysis': {
+                'classifications': relevant_match_types,
+                'pitch_categorization': self._analyze_pitch_categorization(relevant_match_types)
+            },
+            'horizontal_rule_analysis': {
+                'calculations': relevant_h_rules,
+                'timing_failures': [h for h in relevant_h_rules if 'timing_pass' in h and not h['timing_pass']],
+                'match_type_distribution': self._count_match_types(relevant_h_rules)
+            },
+            'cell_decisions': {
+                'decisions': relevant_decisions,
+                'winner_distribution': self._count_decision_winners(relevant_decisions),
+                'update_patterns': [d for d in relevant_decisions if 'updated' in d and d['updated']]
+            },
+            'score_competition': {
+                'score_progression': [s['current_score'] if 'current_score' in s else 0 for s in relevant_scores],
+                'confidence_levels': [s['confidence'] if 'confidence' in s else 0 for s in relevant_scores],
+                'beats_top_score': any('beats_top' in s and s['beats_top'] for s in relevant_scores)
+            },
+            'ornament_context': {
+                'ornament_types': [o['ornament_type'] if 'ornament_type' in o else '' for o in relevant_ornaments],
+                'credit_applied': sum(o['credit'] if 'credit' in o else 0 for o in relevant_ornaments),
+                'has_ornaments': len(relevant_ornaments) > 0
+            },
+            'algorithmic_insights': {
+                'likely_timing_issue': len(failed_checks) > 0,
+                'ornament_interference': len(relevant_ornaments) > 0,
+                'score_competition_active': len(relevant_scores) > 0,
+                'decision_complexity': len(set(d['reason'] if 'reason' in d else '' for d in relevant_decisions))
+            }
+        }
+        
+        # Debug log the extracted context (only when meaningful data found)
+        has_data = any([
+            len(context['timing_constraints']['failed_checks']) > 0,
+            len(context['match_type_analysis']['classifications']) > 0,
+            len(context['horizontal_rule_analysis']['calculations']) > 0,
+            len(context['cell_decisions']['decisions']) > 0,
+            len(context['score_competition']['score_progression']) > 0,
+            len(context['ornament_context']['ornament_types']) > 0
+        ])
+        
+        if has_data:
+            logger.info(f"Extracted comprehensive context for pitch {failure_pitch}: "
+                       f"{len(relevant_timing)} timing checks ({len(context['timing_constraints']['failed_checks'])} failed), "
+                       f"{len(relevant_h_rules)} horizontal rules, "
+                       f"{len(relevant_match_types)} match type analyses")
+        else:
+            raise RuntimeError(f"No comprehensive context data found for failure at {failure_time:.3f}s, pitch {failure_pitch} - "
+                             f"targeted parsing may have missed this failure location")
+        
+        return context
+    
+    def _find_closest_time_for_pitch(self, line_number: int) -> float:
+        """Find the closest time for a given line number by looking at input events."""
+        if 'input_events' not in self.comprehensive_data:
+            raise RuntimeError("Comprehensive data missing input_events - parsing may have failed")
+        input_events = self.comprehensive_data['input_events']
+        for event in input_events:
+            if 'line_number' not in event:
+                raise RuntimeError(f"Input event missing line_number field: {event}")
+            if 'time' not in event:
+                raise RuntimeError(f"Input event missing time field: {event}")
+            if event['line_number'] <= line_number:
+                return event['time']
+        raise RuntimeError(f"No input event found for line number {line_number} - comprehensive data incomplete")
+    
+    def _find_closest_time_for_decision(self, line_number: int) -> float:
+        """Find time for decision by looking at nearby input events."""
+        return self._find_closest_time_for_pitch(line_number)
+    
+    def _find_closest_time_for_score(self, line_number: int) -> float:
+        """Find time for score by looking at nearby input events."""
+        return self._find_closest_time_for_pitch(line_number)
+    
+    def _find_closest_time_for_ornament(self, line_number: int) -> float:
+        """Find time for ornament by looking at nearby input events."""
+        return self._find_closest_time_for_pitch(line_number)
+    
+    def _analyze_pitch_categorization(self, match_analyses: List[Dict]) -> Dict[str, int]:
+        """Analyze how the pitch was categorized."""
+        categories = {
+            'chord': sum(1 for m in match_analyses if 'is_chord' in m and m['is_chord']),
+            'trill': sum(1 for m in match_analyses if 'is_trill' in m and m['is_trill']),
+            'grace': sum(1 for m in match_analyses if 'is_grace' in m and m['is_grace']),
+            'extra': sum(1 for m in match_analyses if 'is_extra' in m and m['is_extra']),
+            'ignored': sum(1 for m in match_analyses if 'is_ignored' in m and m['is_ignored'])
+        }
+        return categories
+    
+    def _count_match_types(self, h_rules: List[Dict]) -> Dict[str, int]:
+        """Count different match types in horizontal rules."""
+        types = {}
+        for rule in h_rules:
+            if 'match_type' not in rule:
+                raise RuntimeError(f"Horizontal rule missing match_type field: {rule}")
+            match_type = rule['match_type']
+            if match_type in types:
+                types[match_type] += 1
+            else:
+                types[match_type] = 1
+        return types
+    
+    def _count_decision_winners(self, decisions: List[Dict]) -> Dict[str, int]:
+        """Count decision winners (vertical vs horizontal)."""
+        winners = {}
+        for decision in decisions:
+            if 'winner' not in decision:
+                raise RuntimeError(f"Cell decision missing winner field: {decision}")
+            winner = decision['winner']
+            if winner in winners:
+                winners[winner] += 1
+            else:
+                winners[winner] = 1
+        return winners
 
 
 def analyze_log_file(log_file_or_analysis: Path) -> FailureReport:
@@ -411,7 +676,9 @@ def main():
         
         if report.failure_contexts:
             print(f"\nFailure Types:")
-            type_dist = report.summary_statistics.get('failure_type_distribution', {})
+            if 'failure_type_distribution' not in report.summary_statistics:
+                raise RuntimeError("Summary statistics missing failure_type_distribution - analysis failed")
+            type_dist = report.summary_statistics['failure_type_distribution']
             for failure_type, count in type_dist.items():
                 print(f"  {failure_type}: {count}")
             

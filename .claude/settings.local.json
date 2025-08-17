@@ -5,7 +5,9 @@
       "Bash(del \"C:\\Repos\\EllieScoreFollowing\\src\\score_follower.srp\")",
       "Bash(mkdir:*)",
       "Bash(python run_debug_test.py:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

@@ -23,7 +23,7 @@ REPORTS_DIR.mkdir(exist_ok=True)
 # Test execution settings
 SERPENT_EXECUTABLE = "serpent64"
 TEST_SCRIPT = "run_bench"
-TEST_TIMEOUT = 5   # seconds
+TEST_TIMEOUT = 10   # seconds
 
 # Debug log format
 DEBUG_LOG_PREFIX = "DP|"
@@ -51,7 +51,21 @@ LOG_PATTERNS = {
     "match_found": r"MATCH\|r:(\d+)\|p:(\d+)\|t:([\d.]+)\|score:([\d.]+)",
     "no_match": r"NO_MATCH\|p:(\d+)\|t:([\d.]+)",
     "test_start": r"TEST_START\|case:(\d+)\|score:(.*)\|perf:(.*)",
-    "test_end": r"TEST_END\|case:(\d+)\|matches:(\d+)\|total:(\d+)"
+    "test_end": r"TEST_END\|case:(\d+)\|matches:(\d+)\|total:(\d+)",
+    
+    # Ultra-comprehensive logging patterns
+    "input_event": r"INPUT\|c:(\d+)\|p:(\d+)\|t:([\d.]+)",
+    "matrix_state": r"MATRIX\|c:(\d+)\|ws:(\d+)\|we:(\d+)\|wc:(\d+)\|cb:(\d+)\|pb:(\d+)\|cu:(\d+)\|pu:(\d+)",
+    "cell_state": r"CELL\|r:(\d+)\|v:([-\d.]+)\|u:\[([\d,]*)\]\|uc:(\d+)\|t:([-\d.]+)",
+    "vertical_rule": r"VRULE\|r:(\d+)\|up:([-\d.]+)\|pen:([-\d.]+)\|res:([-\d.]+)\|sp:(\w+)",
+    "horizontal_rule": r"HRULE\|r:(\d+)\|pv:([-\d.]+)\|pit:(\d+)\|ioi:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|typ:(\w+)\|res:([-\d.]+)",
+    "timing_check": r"TIMING\|pt:([-\d.]+)\|ct:([-\d.]+)\|ioi:([-\d.]+)\|span:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|type:(\w+)",
+    "match_type": r"MATCH_TYPE\|pit:(\d+)\|ch:(\w+)\|tr:(\w+)\|gr:(\w+)\|ex:(\w+)\|ign:(\w+)\|used:(\w+)\|time:(\w+)\|orn:(\w+)",
+    "cell_decision": r"DECISION\|r:(\d+)\|vr:([-\d.]+)\|hr:([-\d.]+)\|win:(\w+)\|upd:(\w+)\|val:([-\d.]+)\|reason:(\w+)",
+    "array_neighborhood": r"ARRAY\|r:(\d+)\|center:([-\d.]+)\|vals:\[([-\d.,]+)\]\|pos:([\d,]+)",
+    "score_competition": r"SCORE\|r:(\d+)\|cur:([-\d.]+)\|top:([-\d.]+)\|beat:(\w+)\|margin:([-\d.]+)\|conf:([-\d.]+)",
+    "ornament_processing": r"ORNAMENT\|pit:(\d+)\|type:(\w+)\|tr:\[([\d,]*)\]\|gr:\[([\d,]*)\]\|ig:\[([\d,]*)\]\|credit:([-\d.]+)",
+    "window_movement": r"WINDOW_MOVE\|oc:(\d+)\|nc:(\d+)\|os:(\d+)\|ns:(\d+)\|oe:(\d+)\|ne:(\d+)\|reason:(\w+)"
 }
 
 # File naming conventions
