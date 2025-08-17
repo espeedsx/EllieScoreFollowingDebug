@@ -5,7 +5,7 @@
             "name": "Debug Workflow 743",
             "type": "python",
             "request": "launch",
-            "program": "debug\\debug_workflow.py",
+            "program": "debug\\src\\debug_workflow.py",
             "args": [
                 "743",
                 "--score-time",
@@ -16,14 +16,14 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}\\debug"
+                "PYTHONPATH": "${workspaceFolder}\\debug\\src"
             }
         },
         {
             "name": "Debug Workflow - General",
             "type": "python",
             "request": "launch",
-            "program": "debug\\debug_workflow.py",
+            "program": "debug\\src\\debug_workflow.py",
             "args": [
                 "${input:testCaseId}",
                 "--score-time",
@@ -34,14 +34,14 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}\\debug"
+                "PYTHONPATH": "${workspaceFolder}\\debug\\src"
             }
         },
         {
             "name": "Debug Workflow - Skip Execution",
             "type": "python",
             "request": "launch",
-            "program": "debug\\debug_workflow.py",
+            "program": "debug\\src\\debug_workflow.py",
             "args": [
                 "${input:testCaseId}",
                 "--skip-execution",
@@ -53,7 +53,7 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}\\debug"
+                "PYTHONPATH": "${workspaceFolder}\\debug\\src"
             }
         }
     ],

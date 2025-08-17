@@ -2,7 +2,7 @@
     "python.defaultInterpreterPath": "python",
     "python.terminal.activateEnvironment": true,
     "python.analysis.extraPaths": [
-        "./debug"
+        "./debug/src"
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": false,

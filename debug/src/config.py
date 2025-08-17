@@ -6,9 +6,10 @@ import os
 from pathlib import Path
 
 # Base paths
-DEBUG_DIR = Path(__file__).parent
-ROOT_DIR = DEBUG_DIR.parent
-SRC_DIR = ROOT_DIR / "src"
+SRC_DIR = Path(__file__).parent  # This is now debug/src
+DEBUG_DIR = SRC_DIR.parent       # This is debug
+ROOT_DIR = DEBUG_DIR.parent      # This is the project root
+SERPENT_SRC_DIR = ROOT_DIR / "src"  # This is the Serpent source directory
 
 # Log directories
 LOGS_DIR = DEBUG_DIR / "logs"

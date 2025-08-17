@@ -7,7 +7,9 @@
       "Bash(python run_debug_test.py:*)",
       "Bash(python:*)",
       "Bash(grep:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(move:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

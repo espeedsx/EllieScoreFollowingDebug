@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Optional, Tuple, Dict, Any
 
 from config import (
-    SRC_DIR, LOGS_DIR, SERPENT_EXECUTABLE, TEST_SCRIPT, TEST_TIMEOUT,
+    SERPENT_SRC_DIR, LOGS_DIR, SERPENT_EXECUTABLE, TEST_SCRIPT, TEST_TIMEOUT,
     get_log_filename
 )
 from utils import setup_logging, get_timestamp, format_duration
@@ -110,9 +110,9 @@ class TestExecutor:
         try:
             # Change to source directory
             original_cwd = os.getcwd()
-            os.chdir(SRC_DIR)
+            os.chdir(SERPENT_SRC_DIR)
             
-            logger.info(f"Working directory: {SRC_DIR}")
+            logger.info(f"Working directory: {SERPENT_SRC_DIR}")
             logger.info(f"Timeout: {TEST_TIMEOUT} seconds")
             
             # Start process
