@@ -70,8 +70,8 @@ LOG_PATTERNS = {
     "cevent_summary": r"CEVENT\|row:(\d+)\|score_time:([-\d.]+)\|pitch_count:(\d+)\|time_span:([-\d.]+)\|ornament_count:(\d+)\|expected:(\d+)\|pitches_str:(\[[\d,\s]*\])",
     
     # Human-readable explanation patterns
-    "match_explanation": r"MATCH_EXPLAIN\|pitch:(\d+)\|reason:(.*?)\|score:([-\d.]+)\|timing:([\d.]+)\|context:(.*?)",
-    "no_match_explanation": r"NO_MATCH_EXPLAIN\|pitch:(\d+)\|reason:(.*?)\|constraint:(.*?)\|timing:([\d.]+)\|expected:(.*?)",
+    "match_explanation": r"MATCH_EXPLAIN\|pitch:(\d+)\|reason:(.*?)\|score:([-\d.]+)\|timing:([\d.]+)\|context:(.*?)\|source_line:(\d+)",
+    "no_match_explanation": r"NO_MATCH_EXPLAIN\|pitch:(\d+)\|reason:(.*?)\|constraint:(.*?)\|timing:([\d.]+)\|expected:(.*?)\|source_line:(\d+)",
     "decision_explanation": r"DECISION_EXPLAIN\|row:(\d+)\|pitch:(\d+)\|reasoning:(.*?)\|vertical_score:([-\d.]+)\|horizontal_score:([-\d.]+)\|winner:(\w+)\|confidence:([\d.]+)",
     "timing_explanation": r"TIMING_EXPLAIN\|pitch:(\d+)\|ioi:([-\d.]+)\|limit:([-\d.]+)\|pass:(\w+)\|reason:(.*?)\|context:(.*?)",
     "ornament_explanation": r"ORNAMENT_EXPLAIN\|pitch:(\d+)\|type:(\w+)\|processing:(.*?)\|credit:([-\d.]+)\|pitches_context:(.*?)"

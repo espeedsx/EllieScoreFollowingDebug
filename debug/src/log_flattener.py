@@ -251,9 +251,16 @@ class LogFlattener:
         
         # Check if this is a MATCH/NO_MATCH (ends current input block)
         if line.startswith('MATCH|') or line.startswith('NO_MATCH|'):
-            # Add to current block and process it
+            # Add to current block but don't process yet - wait for explanation
             self.current_input_logs.append(line)
-            self._process_input_logs()
+            return
+        
+        # Check if this is an explanation (follows MATCH/NO_MATCH)
+        if line.startswith('MATCH_EXPLAIN|') or line.startswith('NO_MATCH_EXPLAIN|'):
+            # Add explanation to current block and then process it
+            if self.current_input_logs:
+                self.current_input_logs.append(line)
+                self._process_input_logs()
             return
         
         # Add to current input block if we have one
@@ -310,8 +317,12 @@ class LogFlattener:
                         dp_entries[row] = {}
                     dp_entries[row][log_type] = data
                 else:
-                    # Matrix state applies to all entries
-                    input_data[log_type] = data
+                    # Matrix state and explanations apply to all entries
+                    # For explanations, merge the data fields directly into input_data
+                    if log_type in ['match_explanation', 'no_match_explanation', 'timing_explanation', 'ornament_explanation']:
+                        input_data.update(data)
+                    else:
+                        input_data[log_type] = data
             elif log_type in ['match_found', 'no_match']:
                 result_data = {'type': log_type, 'data': data}
         
@@ -550,15 +561,15 @@ class LogFlattener:
             }
         
         elif log_type == 'match_explanation':
-            pitch, reason, score, timing, context = groups
+            pitch, reason, score, timing, context, source_line = groups
             return {
-                'match_explanation': f"Pitch {pitch} matched: {reason} (score={score}, timing={timing}, context={context})"
+                'match_explanation': f"Pitch {pitch} matched: {reason} (score={score}, timing={timing}, context={context}, source_line={source_line})"
             }
         
         elif log_type == 'no_match_explanation':
-            pitch, reason, constraint, timing, expected = groups
+            pitch, reason, constraint, timing, expected, source_line = groups
             return {
-                'no_match_explanation': f"Pitch {pitch} no match: {reason} (constraint={constraint}, timing={timing}, expected={expected})"
+                'no_match_explanation': f"Pitch {pitch} no match: {reason} (constraint={constraint}, timing={timing}, expected={expected}, source_line={source_line})"
             }
         
         elif log_type == 'decision_explanation':
@@ -605,6 +616,14 @@ class LogFlattener:
                 for entry in pbar:
                     # Convert dataclass to dict
                     row_dict = {field.name: getattr(entry, field.name) for field in fields(entry)}
+                    
+                    # Replace empty explanation fields with "na"
+                    explanation_fields = ['match_explanation', 'no_match_explanation', 
+                                        'decision_explanation', 'timing_explanation', 'ornament_explanation']
+                    for field in explanation_fields:
+                        if field in row_dict and (row_dict[field] is None or row_dict[field] == ''):
+                            row_dict[field] = 'na'
+                    
                     writer.writerow(row_dict)
         
         logger.info(f"CSV file written successfully")

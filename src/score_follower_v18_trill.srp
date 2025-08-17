@@ -182,15 +182,17 @@ def log_cevent_summary(row, cevent):
                  "|pitches_str:" + format_pitch_array_string(cevent.pitches))
 
 // Human-readable explanation logging functions
-def log_match_explanation(pitch, reason, score, timing, context):
+def log_match_explanation(pitch, reason, score, timing, context, line_number):
     if LOG_DEBUG:
         debug_log("MATCH_EXPLAIN|pitch:" + str(pitch) + "|reason:" + str(reason) + 
-                 "|score:" + str(score) + "|timing:" + str(timing) + "|context:" + str(context))
+                 "|score:" + str(score) + "|timing:" + str(timing) + "|context:" + str(context) +
+                 "|source_line:" + str(line_number))
 
-def log_no_match_explanation(pitch, reason, constraint, timing, expected):
+def log_no_match_explanation(pitch, reason, constraint, timing, expected, line_number):
     if LOG_DEBUG:
         debug_log("NO_MATCH_EXPLAIN|pitch:" + str(pitch) + "|reason:" + str(reason) + 
-                 "|constraint:" + str(constraint) + "|timing:" + str(timing) + "|expected:" + str(expected))
+                 "|constraint:" + str(constraint) + "|timing:" + str(timing) + "|expected:" + str(expected) +
+                 "|source_line:" + str(line_number))
 
 def log_decision_explanation(row, pitch, reasoning, vertical_score, horizontal_score, winner, confidence):
     if LOG_DEBUG:
@@ -1573,7 +1575,7 @@ class Score_follower:
                 var timing_info = "IOI=" + str(ioi) + ",limit=" + str(timing_limit) + ",span=" + str(timing_span)
                 var context = "Chord=" + chord_pitches_str + ",Used=" + format_pitch_array_string(prev.used) + ",Score=" + str(v)
                 var chord_explanation = generate_match_explanation(pitch, match_type, (v - prev.value), timing_info, context)
-                log_match_explanation(pitch, chord_explanation, v, time, context)
+                // log_match_explanation(pitch, chord_explanation, v, time, context, 1578)  // REMOVED: intermediate explanation
             elif (cur_cevt.ornaments and cur_cevt.ornaments.trill_pitches and
                   (pitch in cur_cevt.ornaments.trill_pitches) and
                   ((len(prev.used) == 0) or
@@ -1644,7 +1646,7 @@ class Score_follower:
                 var extra_timing_info = "IOI=" + str(ioi) + ",timing_ok=" + str(timing_ok)
                 var extra_expected_context = "Chord=" + extra_chord_pitches_str + ",Trills=" + extra_trill_pitches_str + ",Grace=" + extra_grace_pitches_str
                 var extra_explanation = generate_no_match_explanation(pitch, "extra_note", "not_in_expected", extra_timing_info, extra_expected_context)
-                log_no_match_explanation(pitch, extra_explanation, "not_in_expected", ioi, extra_expected_context)
+                // log_no_match_explanation(pitch, extra_explanation, "not_in_expected", ioi, extra_expected_context, 1649)  // REMOVED: intermediate explanation
                 
             // Log comprehensive match type analysis before decision  
             var is_ignored_type = (match_type == "ignored_note" or match_type == "repeated_note")
@@ -1726,30 +1728,31 @@ class Score_follower:
 
         mm.got_result(result)
         
-        // Log match result with explanations
+        // FINAL DECISION LOGGING: This is where the algorithm makes the ultimate match/no-match decision
         if LOG_DEBUG:
             if result.isa_match():
                 debug_log("MATCH|row:" + str(top_row) + "|pitch:" + str(pitch) + "|perf_time:" + str(time) + "|score:" + str(top_score))
                 
-                // Generate comprehensive match explanation
+                // FINAL MATCH EXPLANATION - Only one per input note (Line 1733: result.isa_match())
                 var cevent_pitches_str = format_pitch_array_string(ref_track[top_row - 1].pitches) if top_row > 0 else "[]"
-                var timing_info = "IOI=" + str(time - last_evt_time) if last_evt_time >= 0 else "first_note"
-                var context = "Score_row=" + str(top_row) + ",Expected_pitches=" + cevent_pitches_str + ",Score_time=" + str(ref_track[top_row - 1].time) if top_row > 0 else "unknown"
-                var match_explanation = generate_match_explanation(pitch, "successful_match", top_score, timing_info, context)
-                log_match_explanation(pitch, match_explanation, top_score, time, context)
+                var timing_info = "IOI=" + str(time - last_evt_time) if last_evt_time >= 0 else "first_note"  
+                var final_context = "FINAL_MATCH at line 1733: Row=" + str(top_row) + " | Expected=" + cevent_pitches_str + " | Score=" + str(top_score)
+                var final_explanation = "FINAL DECISION (line 1733): Pitch " + str(pitch) + " MATCHED at score row " + str(top_row) + 
+                                       " | Alignment score: " + str(top_score) + " | " + timing_info + " | Expected: " + cevent_pitches_str
+                log_match_explanation(pitch, final_explanation, top_score, time, final_context, 1733)
                 
             else:
                 debug_log("NO_MATCH|pitch:" + str(pitch) + "|perf_time:" + str(time))
                 
-                // Generate comprehensive no-match explanation  
+                // FINAL NO-MATCH EXPLANATION - Only one per input note (Line 1743: else clause)
                 var window_info = "Window=[" + str(mm.win_start) + "-" + str(mm.win_end) + "],Center=" + str(mm.win_center)
                 var expected_pitches = ""
                 if mm.win_center > 0 and mm.win_center <= len(ref_track):
                     expected_pitches = format_pitch_array_string(ref_track[mm.win_center - 1].pitches)
-                var timing_constraint = "None_in_window"
-                var expected_context = window_info + ",Expected=" + expected_pitches
-                var no_match_explanation = generate_no_match_explanation(pitch, "no_match_in_window", timing_constraint, time, expected_context)
-                log_no_match_explanation(pitch, no_match_explanation, timing_constraint, time, expected_context)
+                var final_context = "FINAL_NO_MATCH at line 1743: " + window_info + " | Expected=" + expected_pitches
+                var final_explanation = "FINAL DECISION (line 1743): Pitch " + str(pitch) + " NO MATCH | " + 
+                                       "Search window exhausted | " + window_info + " | Expected: " + expected_pitches
+                log_no_match_explanation(pitch, final_explanation, "search_exhausted", time, final_context, 1743)
 
         // print "dynamic_match: match_stime", result.match_stime, "pos",
         // print     result.pos, "matches", result.matches
