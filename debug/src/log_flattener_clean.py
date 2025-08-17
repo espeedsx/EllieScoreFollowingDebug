@@ -11,7 +11,6 @@ This enables pattern analysis to identify what conditions lead to no-match/misma
 import re
 import csv
 import argparse
-import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, fields
@@ -26,26 +25,24 @@ logger = setup_logging(__name__)
 
 @dataclass
 class FlattenedLogEntry:
-    """Complete flattened representation of a DP decision with all context.
+    """Complete flattened representation of a DP decision with all context."""
     
-    Fields are ordered to match the actual algorithm execution flow for optimal debugging:
-    
-    SECTION 1: INPUT CONTEXT (Columns 1-3) - What triggered this analysis?
-    SECTION 2: ALGORITHM STATE (Columns 4-5) - Current DP state and target
-    SECTION 3: DP COMPUTATION (Columns 6-9) - Core algorithm execution  
-    SECTION 4: MUSICAL ANALYSIS (Columns 10-12) - Musical context evaluation
-    SECTION 5: FINAL RESULT (Columns 13-14) - Match/no-match outcome
-    SECTION 6: DEBUGGING CONTEXT (Columns 15-17) - Analysis and diagnostics
-    """
-    
-    # SECTION 1: INPUT CONTEXT - What performance note triggered this analysis?
-    
-    # 1. INPUT GROUP - Performance note that triggered DP analysis
+    # INPUT GROUP - Shared context for all DP decisions in same column
     input_column: int = 0
     input_pitch: int = 0
     input_perf_time: float = 0.0
     
-    # 2. MATRIX GROUP - Algorithm state: where is the search window?
+    # MATCH GROUP - Only populated if this resulted in a successful match
+    match_row: int = 0
+    match_pitch: int = 0
+    match_perf_time: float = 0.0
+    match_score: float = 0.0
+    
+    # NO_MATCH GROUP - Only populated if this resulted in no match
+    no_match_pitch: int = 0
+    no_match_perf_time: float = 0.0
+    
+    # MATRIX GROUP - Shared matrix state for all decisions in same column
     matrix_window_start: int = 0
     matrix_window_end: int = 0
     matrix_window_center: int = 0
@@ -54,7 +51,7 @@ class FlattenedLogEntry:
     matrix_current_upper: int = 0
     matrix_prev_upper: int = 0
     
-    # 3. CEVENT GROUP - Target score event being evaluated
+    # CEVENT GROUP - Shared score event context for all decisions in same row
     cevent_row: int = 0
     cevent_score_time: float = 0.0
     cevent_pitch_count: int = 0
@@ -62,22 +59,37 @@ class FlattenedLogEntry:
     cevent_ornament_count: int = 0
     cevent_expected: int = 0
     
-    # SECTION 2: DP COMPUTATION - Core algorithm execution in order
+    # DP GROUP - Core dynamic programming decision
+    dp_row: int = 0
+    dp_vertical_rule: float = 0.0
+    dp_horizontal_rule: float = 0.0
+    dp_final_value: float = 0.0
+    dp_match: int = 0
+    dp_used_pitches: str = ""
+    dp_unused_count: int = 0
     
-    # 4. CELL GROUP - Previous DP cell state (starting point)
+    # CELL GROUP - Cell state before processing
     cell_time: float = -1.0
     cell_value: float = 0.0
     cell_used_pitches: str = ""
     cell_unused_count: int = 0
     cell_score_time: float = 0.0
     
-    # 5. VRULE GROUP - Vertical rule: cost of skipping score event (applied first)
+    # VRULE GROUP - Vertical rule calculation details
     vrule_up_value: float = 0.0
     vrule_penalty: float = 0.0
     vrule_result: float = 0.0
     vrule_start_point: str = ""
     
-    # 6. TIMING GROUP - Timing constraint validation (critical for horizontal rule)
+    # HRULE GROUP - Horizontal rule calculation details
+    hrule_prev_value: float = 0.0
+    hrule_ioi: float = 0.0
+    hrule_limit: float = 0.0
+    hrule_timing_pass: str = ""
+    hrule_match_type: str = ""
+    hrule_result: float = 0.0
+    
+    # TIMING GROUP - Detailed timing constraint analysis
     timing_prev_cell_time: float = -1.0
     timing_curr_perf_time: float = 0.0
     timing_ioi: float = 0.0
@@ -86,17 +98,7 @@ class FlattenedLogEntry:
     timing_pass: str = ""
     timing_constraint_type: str = ""
     
-    # 7. HRULE GROUP - Horizontal rule: performance note matching logic
-    hrule_prev_value: float = 0.0
-    hrule_ioi: float = 0.0
-    hrule_limit: float = 0.0
-    hrule_timing_pass: str = ""
-    hrule_match_type: str = ""
-    hrule_result: float = 0.0
-    
-    # SECTION 3: MUSICAL ANALYSIS - Musical context and ornament processing
-    
-    # 8. MATCHTYPE GROUP - Musical context classification (what type of match?)
+    # MATCHTYPE GROUP - Match type classification analysis
     matchtype_is_chord: str = ""
     matchtype_is_trill: str = ""
     matchtype_is_grace: str = ""
@@ -106,14 +108,7 @@ class FlattenedLogEntry:
     matchtype_timing_ok: str = ""
     matchtype_ornament_info: str = ""
     
-    # 9. ORNAMENT GROUP - Ornament-specific processing details
-    ornament_type: str = ""
-    ornament_trill_pitches: str = ""
-    ornament_grace_pitches: str = ""
-    ornament_ignore_pitches: str = ""
-    ornament_credit_applied: float = 0.0
-    
-    # 10. DECISION GROUP - Final DP cell decision (vrule vs hrule winner)
+    # DECISION GROUP - Final cell decision
     decision_vertical_result: float = 0.0
     decision_horizontal_result: float = 0.0
     decision_winner: str = ""
@@ -121,47 +116,29 @@ class FlattenedLogEntry:
     decision_final_value: float = 0.0
     decision_reason: str = ""
     
-    # SECTION 4: ALGORITHM RESULT - Final DP computation and outcomes
-    
-    # 11. DP GROUP - Summary of DP computation for this cell
-    dp_row: int = 0
-    dp_vertical_rule: float = 0.0
-    dp_horizontal_rule: float = 0.0
-    dp_final_value: float = 0.0
-    dp_match: int = 0
-    dp_used_pitches: str = ""
-    dp_unused_count: int = 0
-    
-    # 12. SCORE GROUP - How does this cell compete globally?
+    # SCORE GROUP - Score competition analysis
     score_current_score: float = 0.0
     score_top_score: float = 0.0
     score_beats_top: str = ""
     score_margin: float = 0.0
     score_confidence: float = 0.0
     
-    # SECTION 5: FINAL OUTCOME - Overall INPUT block result
+    # ORNAMENT GROUP - Ornament processing details
+    ornament_type: str = ""
+    ornament_trill_pitches: str = ""
+    ornament_grace_pitches: str = ""
+    ornament_ignore_pitches: str = ""
+    ornament_credit_applied: float = 0.0
     
-    # 13. RESULT GROUP - Final classification of this INPUT block
-    result_type: str = ""  # "match", "no_match", "unprocessed"
-    
-    # 14. MATCH GROUP - Match details (populated only if successful)
-    match_row: int = 0
-    match_pitch: int = 0
-    match_perf_time: float = 0.0
-    match_score: float = 0.0
-    
-    # 15. NO_MATCH GROUP - No-match details (populated only if failed)
-    no_match_pitch: int = 0
-    no_match_perf_time: float = 0.0
-    
-    # SECTION 6: DEBUGGING CONTEXT - Analysis and diagnostics
-    
-    # 16. ARRAY GROUP - DP matrix neighborhood for validation
+    # ARRAY GROUP - Array neighborhood context
     array_center_value: float = 0.0
     array_neighbor_values: str = ""
     array_neighbor_positions: str = ""
     
-    # 17. BUG GROUP - Algorithm bug detection and systematic issues
+    # RESULT GROUP - Final result classification
+    result_type: str = ""  # "match", "no_match", "unprocessed"
+    
+    # BUG GROUP - Algorithm bug detection
     bug_has_timing_bug: bool = False
     bug_description: str = ""
 
@@ -256,7 +233,6 @@ class LogFlattener:
         
         if not matched and not line.startswith(('MATCH|', 'NO_MATCH|', 'INPUT|')):
             self.stats['unmatched_lines'] += 1
-    
 
     def _process_input_logs(self):
         """Process all logs for one complete input to create flattened entries."""
@@ -654,4 +630,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+    import logging
     sys.exit(main())
