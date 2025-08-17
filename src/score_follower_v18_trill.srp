@@ -44,60 +44,60 @@ def format_pitches_compact(pitches):
     return result
 
 def log_dp_decision(col, row, pitch, time, vert_rule, horiz_rule, final_val, match_flag, used_pitches, unused_count):
-    // Log a dynamic programming decision in compact format
+    // Log a dynamic programming decision in readable format
     if LOG_DEBUG:
         var used_str = format_pitches_compact(used_pitches)
         var match_val = 1 if match_flag else 0
-        var message = "DP|c:" + str(col) + "|r:" + str(row) + "|p:" + str(pitch) + 
-                     "|t:" + str(time) + "|vr:" + str(vert_rule) + "|hr:" + str(horiz_rule) + 
-                     "|f:" + str(final_val) + "|m:" + str(match_val) + "|u:[" + used_str + 
-                     "]|uc:" + str(unused_count)
+        var message = "DP|column:" + str(col) + "|row:" + str(row) + "|pitch:" + str(pitch) + 
+                     "|perf_time:" + str(time) + "|vertical_rule:" + str(vert_rule) + "|horizontal_rule:" + str(horiz_rule) + 
+                     "|final_value:" + str(final_val) + "|match:" + str(match_val) + "|used_pitches:[" + used_str + 
+                     "]|unused_count:" + str(unused_count)
         debug_log(message)
 
 // Ultra-comprehensive algorithm logging functions (controlled by LOG_DEBUG / -d flag)
 
 def log_input_event(col, pitch, time):
     if LOG_DEBUG:
-        debug_log("INPUT|c:" + str(col) + "|p:" + str(pitch) + "|t:" + str(time))
+        debug_log("INPUT|column:" + str(col) + "|pitch:" + str(pitch) + "|perf_time:" + str(time))
 
 def log_matrix_state(col, win_start, win_end, win_center, cur_base, prev_base, cur_upper, prev_upper):
     if LOG_DEBUG:
-        debug_log("MATRIX|c:" + str(col) + "|ws:" + str(win_start) + "|we:" + str(win_end) + 
-                 "|wc:" + str(win_center) + "|cb:" + str(cur_base) + "|pb:" + str(prev_base) + 
-                 "|cu:" + str(cur_upper) + "|pu:" + str(prev_upper))
+        debug_log("MATRIX|column:" + str(col) + "|window_start:" + str(win_start) + "|window_end:" + str(win_end) + 
+                 "|window_center:" + str(win_center) + "|current_base:" + str(cur_base) + "|prev_base:" + str(prev_base) + 
+                 "|current_upper:" + str(cur_upper) + "|prev_upper:" + str(prev_upper))
 
-def log_cell_state(row, value, used, unused_count, time):
+def log_cell_state(row, value, used, unused_count, time, score_time):
     if LOG_DEBUG:
         var used_str = format_pitches_compact(used)
-        debug_log("CELL|r:" + str(row) + "|v:" + str(value) + "|u:[" + used_str + "]|uc:" + str(unused_count) + "|t:" + str(time))
+        debug_log("CELL|row:" + str(row) + "|value:" + str(value) + "|used_pitches:[" + used_str + "]|unused_count:" + str(unused_count) + "|cell_time:" + str(time) + "|score_time:" + str(score_time))
 
 def log_vertical_rule(row, up_value, penalty, result, start_point_check):
     if LOG_DEBUG:
-        debug_log("VRULE|r:" + str(row) + "|up:" + str(up_value) + "|pen:" + str(penalty) + 
-                 "|res:" + str(result) + "|sp:" + str(start_point_check))
+        debug_log("VRULE|row:" + str(row) + "|up_value:" + str(up_value) + "|penalty:" + str(penalty) + 
+                 "|result:" + str(result) + "|start_point:" + str(start_point_check))
 
 def log_horizontal_rule(row, prev_value, pitch, ioi, limit, timing_pass, match_type, result):
     if LOG_DEBUG:
-        debug_log("HRULE|r:" + str(row) + "|pv:" + str(prev_value) + "|pit:" + str(pitch) + 
-                 "|ioi:" + str(ioi) + "|lim:" + str(limit) + "|pass:" + str(timing_pass) + 
-                 "|typ:" + str(match_type) + "|res:" + str(result))
+        debug_log("HRULE|row:" + str(row) + "|prev_value:" + str(prev_value) + "|pitch:" + str(pitch) + 
+                 "|ioi:" + str(ioi) + "|limit:" + str(limit) + "|timing_pass:" + str(timing_pass) + 
+                 "|match_type:" + str(match_type) + "|result:" + str(result))
 
 def log_timing_check(prev_time, curr_time, ioi, span, limit, timing_pass, constraint_type):
     if LOG_DEBUG:
-        debug_log("TIMING|pt:" + str(prev_time) + "|ct:" + str(curr_time) + "|ioi:" + str(ioi) + 
-                 "|span:" + str(span) + "|lim:" + str(limit) + "|pass:" + str(timing_pass) + 
-                 "|type:" + str(constraint_type))
+        debug_log("TIMING|prev_cell_time:" + str(prev_time) + "|curr_perf_time:" + str(curr_time) + "|ioi:" + str(ioi) + 
+                 "|span:" + str(span) + "|limit:" + str(limit) + "|timing_pass:" + str(timing_pass) + 
+                 "|constraint_type:" + str(constraint_type))
 
 def log_match_type_analysis(pitch, is_chord, is_trill, is_grace, is_extra, is_ignored, already_used, timing_ok, ornament_info):
     if LOG_DEBUG:
-        debug_log("MATCH_TYPE|pit:" + str(pitch) + "|ch:" + str(is_chord) + "|tr:" + str(is_trill) + 
-                 "|gr:" + str(is_grace) + "|ex:" + str(is_extra) + "|ign:" + str(is_ignored) + 
-                 "|used:" + str(already_used) + "|time:" + str(timing_ok) + "|orn:" + str(ornament_info))
+        debug_log("MATCH_TYPE|pitch:" + str(pitch) + "|is_chord:" + str(is_chord) + "|is_trill:" + str(is_trill) + 
+                 "|is_grace:" + str(is_grace) + "|is_extra:" + str(is_extra) + "|is_ignored:" + str(is_ignored) + 
+                 "|already_used:" + str(already_used) + "|timing_ok:" + str(timing_ok) + "|ornament_info:" + str(ornament_info))
 
 def log_cell_decision(row, vert_result, horiz_result, winner, updated, final_value, reason):
     if LOG_DEBUG:
-        debug_log("DECISION|r:" + str(row) + "|vr:" + str(vert_result) + "|hr:" + str(horiz_result) + 
-                 "|win:" + str(winner) + "|upd:" + str(updated) + "|val:" + str(final_value) + "|reason:" + str(reason))
+        debug_log("DECISION|row:" + str(row) + "|vertical_result:" + str(vert_result) + "|horizontal_result:" + str(horiz_result) + 
+                 "|winner:" + str(winner) + "|updated:" + str(updated) + "|final_value:" + str(final_value) + "|reason:" + str(reason))
 
 def log_array_neighborhood(row, center_value, neighbors, positions):
     if LOG_DEBUG:
@@ -105,25 +105,35 @@ def log_array_neighborhood(row, center_value, neighbors, positions):
         for i = 0 to len(neighbors):
             if i > 0: vals_str = vals_str + ","
             vals_str = vals_str + str(neighbors[i])
-        debug_log("ARRAY|r:" + str(row) + "|center:" + str(center_value) + "|vals:[" + vals_str + "]|pos:" + str(positions))
+        debug_log("ARRAY|row:" + str(row) + "|center_value:" + str(center_value) + "|values:[" + vals_str + "]|positions:" + str(positions))
 
 def log_score_competition(row, current_score, top_score, beats_top, margin, confidence):
     if LOG_DEBUG:
-        debug_log("SCORE|r:" + str(row) + "|cur:" + str(current_score) + "|top:" + str(top_score) + 
-                 "|beat:" + str(beats_top) + "|margin:" + str(margin) + "|conf:" + str(confidence))
+        debug_log("SCORE|row:" + str(row) + "|current_score:" + str(current_score) + "|top_score:" + str(top_score) + 
+                 "|beats_top:" + str(beats_top) + "|margin:" + str(margin) + "|confidence:" + str(confidence))
 
 def log_ornament_processing(pitch, orn_type, trill_pitches, grace_pitches, ignore_pitches, credit_applied):
     if LOG_DEBUG:
         var tr_str = format_pitches_compact(trill_pitches if trill_pitches else [])
         var gr_str = format_pitches_compact(grace_pitches if grace_pitches else [])
         var ig_str = format_pitches_compact(ignore_pitches if ignore_pitches else [])
-        debug_log("ORNAMENT|pit:" + str(pitch) + "|type:" + str(orn_type) + "|tr:[" + tr_str + 
-                 "]|gr:[" + gr_str + "]|ig:[" + ig_str + "]|credit:" + str(credit_applied))
+        debug_log("ORNAMENT|pitch:" + str(pitch) + "|ornament_type:" + str(orn_type) + "|trill_pitches:[" + tr_str + 
+                 "]|grace_pitches:[" + gr_str + "]|ignore_pitches:[" + ig_str + "]|credit_applied:" + str(credit_applied))
 
 def log_window_movement(old_center, new_center, old_start, new_start, old_end, new_end, reason):
     if LOG_DEBUG:
-        debug_log("WINDOW_MOVE|oc:" + str(old_center) + "|nc:" + str(new_center) + "|os:" + str(old_start) + 
-                 "|ns:" + str(new_start) + "|oe:" + str(old_end) + "|ne:" + str(new_end) + "|reason:" + str(reason))
+        debug_log("WINDOW_MOVE|old_center:" + str(old_center) + "|new_center:" + str(new_center) + "|old_start:" + str(old_start) + 
+                 "|new_start:" + str(new_start) + "|old_end:" + str(old_end) + "|new_end:" + str(new_end) + "|reason:" + str(reason))
+
+def log_cevent_summary(row, cevent):
+    if LOG_DEBUG:
+        var ornament_count = 0
+        if cevent.ornaments:
+            if cevent.ornaments.trill_pitches: ornament_count = ornament_count + len(cevent.ornaments.trill_pitches)
+            if cevent.ornaments.grace_pitches: ornament_count = ornament_count + len(cevent.ornaments.grace_pitches)
+            if cevent.ornaments.ignore_pitches: ornament_count = ornament_count + len(cevent.ornaments.ignore_pitches)
+        debug_log("CEVENT|row:" + str(row) + "|score_time:" + str(cevent.time) + "|pitch_count:" + str(len(cevent.pitches)) + 
+                 "|time_span:" + str(cevent.time_span) + "|ornament_count:" + str(ornament_count) + "|expected:" + str(cevent.expected))
 
 def init_debug_log():
     if LOG_DEBUG:
@@ -1381,9 +1391,6 @@ class Score_follower:
             var cur = mm.curcol(rk)
             var curup = mm.curcol(rk - 1)  // previous row of current column
 
-            // Log initial cell state before processing
-            log_cell_state(rk, cur.value, cur.used, cur.unused_count, cur.time)
-
             if LOG2:
                 display " row", rk, cur
                 display "    ", curup
@@ -1398,6 +1405,12 @@ class Score_follower:
                 cur.value = curup.value
 
             var cur_cevt = ref_track[rk - 1]
+            
+            // Log current score event summary
+            log_cevent_summary(rk, cur_cevt)
+            
+            // Log initial cell state before processing
+            log_cell_state(rk, cur.value, cur.used, cur.unused_count, cur.time, cur_cevt.time)
             cur.used.clear()
             cur.unused_count = cur_cevt.expected
             
@@ -1618,9 +1631,9 @@ class Score_follower:
         // Log match result
         if LOG_DEBUG:
             if result.isa_match():
-                debug_log("MATCH|r:" + str(top_row) + "|p:" + str(pitch) + "|t:" + str(time) + "|score:" + str(top_score))
+                debug_log("MATCH|row:" + str(top_row) + "|pitch:" + str(pitch) + "|perf_time:" + str(time) + "|score:" + str(top_score))
             else:
-                debug_log("NO_MATCH|p:" + str(pitch) + "|t:" + str(time))
+                debug_log("NO_MATCH|pitch:" + str(pitch) + "|perf_time:" + str(time))
 
         // print "dynamic_match: match_stime", result.match_stime, "pos",
         // print     result.pos, "matches", result.matches

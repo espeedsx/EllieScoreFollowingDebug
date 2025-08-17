@@ -46,27 +46,28 @@ FAILURE_CONTEXT_WINDOW = 5  # decisions before failure to analyze
 MAX_LOG_SIZE_MB = 10        # maximum log file size to process
 AI_ANALYSIS_MODEL = "claude-3-sonnet-20240229"
 
-# Compact log patterns
+# Readable log patterns
 LOG_PATTERNS = {
-    "dp_entry": r"DP\|c:(\d+)\|r:(\d+)\|p:(\d+)\|t:([\d.]+)\|vr:([-\d.]+)\|hr:([-\d.]+)\|f:([-\d.]+)\|m:([01])\|u:\[([\d,\s]*)\]\|uc:([-\d]+)",
-    "match_found": r"MATCH\|r:(\d+)\|p:(\d+)\|t:([\d.]+)\|score:([\d.]+)",
-    "no_match": r"NO_MATCH\|p:(\d+)\|t:([\d.]+)",
-    "test_start": r"TEST_START\|case:(\d+)\|score:(.*)\|perf:(.*)",
-    "test_end": r"TEST_END\|case:(\d+)\|matches:(\d+)\|total:(\d+)",
+    "dp_entry": r"DP\|column:(\d+)\|row:(\d+)\|pitch:(\d+)\|perf_time:([\d.]+)\|vertical_rule:([-\d.]+)\|horizontal_rule:([-\d.]+)\|final_value:([-\d.]+)\|match:([01])\|used_pitches:\[([\d,\s]*)\]\|unused_count:([-\d]+)",
+    "match_found": r"MATCH\|row:(\d+)\|pitch:(\d+)\|perf_time:([\d.]+)\|score:([\d.]+)",
+    "no_match": r"NO_MATCH\|pitch:(\d+)\|perf_time:([\d.]+)",
+    "test_start": r"TEST_START\|test_case:(\d+)\|score_file:(.*)\|performance_file:(.*)",
+    "test_end": r"TEST_END\|test_case:(\d+)\|matches_found:(\d+)\|total_notes:(\d+)",
     
     # Ultra-comprehensive logging patterns
-    "input_event": r"INPUT\|c:(\d+)\|p:(\d+)\|t:([\d.]+)",
-    "matrix_state": r"MATRIX\|c:(\d+)\|ws:(\d+)\|we:(\d+)\|wc:(\d+)\|cb:(\d+)\|pb:(\d+)\|cu:(\d+)\|pu:(\d+)",
-    "cell_state": r"CELL\|r:(\d+)\|v:([-\d.]+)\|u:\[([\d,\s]*)\]\|uc:([-\d]+)\|t:([-\d.]+)",
-    "vertical_rule": r"VRULE\|r:(\d+)\|up:([-\d.]+)\|pen:([-\d.]+)\|res:([-\d.]+)\|sp:(\w+)",
-    "horizontal_rule": r"HRULE\|r:(\d+)\|pv:([-\d.]+)\|pit:(\d+)\|ioi:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|typ:(\w+)\|res:([-\d.]+)",
-    "timing_check": r"TIMING\|pt:([-\d.]+)\|ct:([-\d.]+)\|ioi:([-\d.]+)\|span:([-\d.]+)\|lim:([-\d.]+)\|pass:(\w+)\|type:(\w+)",
-    "match_type": r"MATCH_TYPE\|pit:(\d+)\|ch:(\w+)\|tr:(\w+)\|gr:(\w+)\|ex:(\w+)\|ign:(\w+)\|used:(\w+)\|time:(\w+)\|orn:(\w+)",
-    "cell_decision": r"DECISION\|r:(\d+)\|vr:([-\d.]+)\|hr:([-\d.]+)\|win:(\w+)\|upd:(\w+)\|val:([-\d.]+)\|reason:(\w+)",
-    "array_neighborhood": r"ARRAY\|r:(\d+)\|center:([-\d.]+)\|vals:\[([-\d.,\s]+)\]\|pos:\[([-\d,\s]+)\]",
-    "score_competition": r"SCORE\|r:(\d+)\|cur:([-\d.]+)\|top:([-\d.]+)\|beat:(\w+)\|margin:([-\d.]+)\|conf:([-\d.]+)",
-    "ornament_processing": r"ORNAMENT\|pit:(\d+)\|type:(\w+)\|tr:\[([\d,]*)\]\|gr:\[([\d,]*)\]\|ig:\[([\d,]*)\]\|credit:([-\d.]+)",
-    "window_movement": r"WINDOW_MOVE\|oc:(\d+)\|nc:(\d+)\|os:(\d+)\|ns:(\d+)\|oe:(\d+)\|ne:(\d+)\|reason:(\w+)"
+    "input_event": r"INPUT\|column:(\d+)\|pitch:(\d+)\|perf_time:([\d.]+)",
+    "matrix_state": r"MATRIX\|column:(\d+)\|window_start:(\d+)\|window_end:(\d+)\|window_center:(\d+)\|current_base:(\d+)\|prev_base:(\d+)\|current_upper:(\d+)\|prev_upper:(\d+)",
+    "cell_state": r"CELL\|row:(\d+)\|value:([-\d.]+)\|used_pitches:\[([\d,\s]*)\]\|unused_count:([-\d]+)\|cell_time:([-\d.]+)\|score_time:([-\d.]+)",
+    "vertical_rule": r"VRULE\|row:(\d+)\|up_value:([-\d.]+)\|penalty:([-\d.]+)\|result:([-\d.]+)\|start_point:(\w+)",
+    "horizontal_rule": r"HRULE\|row:(\d+)\|prev_value:([-\d.]+)\|pitch:(\d+)\|ioi:([-\d.]+)\|limit:([-\d.]+)\|timing_pass:(\w+)\|match_type:(\w+)\|result:([-\d.]+)",
+    "timing_check": r"TIMING\|prev_cell_time:([-\d.]+)\|curr_perf_time:([-\d.]+)\|ioi:([-\d.]+)\|span:([-\d.]+)\|limit:([-\d.]+)\|timing_pass:(\w+)\|constraint_type:(\w+)",
+    "match_type": r"MATCH_TYPE\|pitch:(\d+)\|is_chord:(\w+)\|is_trill:(\w+)\|is_grace:(\w+)\|is_extra:(\w+)\|is_ignored:(\w+)\|already_used:(\w+)\|timing_ok:(\w+)\|ornament_info:(\w+)",
+    "cell_decision": r"DECISION\|row:(\d+)\|vertical_result:([-\d.]+)\|horizontal_result:([-\d.]+)\|winner:(\w+)\|updated:(\w+)\|final_value:([-\d.]+)\|reason:(\w+)",
+    "array_neighborhood": r"ARRAY\|row:(\d+)\|center_value:([-\d.]+)\|values:\[([-\d.,\s]+)\]\|positions:\[([-\d,\s]+)\]",
+    "score_competition": r"SCORE\|row:(\d+)\|current_score:([-\d.]+)\|top_score:([-\d.]+)\|beats_top:(\w+)\|margin:([-\d.]+)\|confidence:([-\d.]+)",
+    "ornament_processing": r"ORNAMENT\|pitch:(\d+)\|ornament_type:(\w+)\|trill_pitches:\[([\d,]*)\]\|grace_pitches:\[([\d,]*)\]\|ignore_pitches:\[([\d,]*)\]\|credit_applied:([-\d.]+)",
+    "window_movement": r"WINDOW_MOVE\|old_center:(\d+)\|new_center:(\d+)\|old_start:(\d+)\|new_start:(\d+)\|old_end:(\d+)\|new_end:(\d+)\|reason:(\w+)",
+    "cevent_summary": r"CEVENT\|row:(\d+)\|score_time:([-\d.]+)\|pitch_count:(\d+)\|time_span:([-\d.]+)\|ornament_count:(\d+)\|expected:(\d+)"
 }
 
 # File naming conventions

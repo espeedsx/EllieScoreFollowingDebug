@@ -15,6 +15,7 @@ from run_debug_test import TestExecutor
 from log_parser import parse_log_file
 from failure_analyzer import analyze_log_file, FailureAnalyzer, FailureContext
 from ai_analyzer import AIAnalyzer, analyze_with_ai_prompt
+from log_flattener import LogFlattener
 
 
 logger = setup_logging(__name__)
@@ -130,6 +131,10 @@ class DebugWorkflow:
             'metrics': parsed_data['metadata']['metrics'],
             'summary': parsed_data['summary']
         }
+        
+        # Generate flattened CSV for pattern analysis
+        csv_file = self._generate_flattened_csv(log_file)
+        self.results['parsing']['flattened_csv'] = str(csv_file)
         
         logger.info(f"Log parsed: {parsed_data['metadata']['metrics']['dp_entries']} DP decisions")
         return parsed_data
@@ -263,6 +268,29 @@ class DebugWorkflow:
             summary['ai_insights_included'] = ai_res['insights_provided']
         
         return summary
+    
+    def _generate_flattened_csv(self, log_file: Path) -> Path:
+        """Generate flattened CSV from log file for pattern analysis."""
+        logger.info("Generating flattened CSV for pattern analysis")
+        
+        csv_file = log_file.with_suffix('.csv')
+        
+        try:
+            flattener = LogFlattener()
+            entries = flattener.parse_log_file(log_file)
+            
+            if entries:
+                flattener.write_csv(entries, csv_file)
+                logger.info(f"Generated flattened CSV: {csv_file} ({len(entries)} entries)")
+            else:
+                logger.warning("No entries found for CSV generation")
+                
+            return csv_file
+        except Exception as e:
+            logger.error(f"Failed to generate flattened CSV: {e}")
+            # Create empty CSV as fallback
+            csv_file.touch()
+            return csv_file
 
     def _get_most_critical_failure(self, failure_contexts: list, after_score_time: Optional[float] = None) -> FailureContext:
         """Get the most critical failure from existing failure contexts."""

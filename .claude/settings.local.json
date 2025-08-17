@@ -15,7 +15,8 @@
     ],
     "deny": [],
     "additionalDirectories": [
-      "C:\\c\\Repos\\EllieScoreFollowingDebug"
+      "C:\\c\\Repos\\EllieScoreFollowingDebug",
+      "C:\\mnt\\c\\Repos\\EllieScoreFollowingDebug"
     ]
   }
 }

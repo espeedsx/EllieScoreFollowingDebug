@@ -182,6 +182,13 @@ def show_next_steps(results, test_case, has_insights):
         print("2. Implement suggested algorithm changes")
         print("3. Test improvements:")
         print(f"   python debug.py {test_case}")
+    
+    # Show CSV analysis option if available
+    parsing_results = results.get('results', {}).get('parsing', {})
+    if 'flattened_csv' in parsing_results:
+        print("\n📊 Pattern Analysis:")
+        print(f"   python src/analyze_csv.py {parsing_results['flattened_csv']}")
+        print(f"   📈 Flattened CSV available: {parsing_results['flattened_csv']}")
         print("4. Compare before/after results")
     
     print(f"\n📚 Documentation:")

@@ -186,7 +186,7 @@ class TestExecutor:
             f.write("#" + "="*50 + "\n\n")
             
             # Add test start marker
-            f.write(f"TEST_START|case:{self.test_case_id}|score:unknown|perf:unknown\n")
+            f.write(f"TEST_START|test_case:{self.test_case_id}|score_file:unknown|performance_file:unknown\n")
             
             # Check if there's a separate debug file from Serpent
             debug_file_env = str(self.log_file)
@@ -221,7 +221,7 @@ class TestExecutor:
                 f.write("\n")
             
             # Add test end marker
-            f.write(f"TEST_END|case:{self.test_case_id}|matches:unknown|total:unknown\n")
+            f.write(f"TEST_END|test_case:{self.test_case_id}|matches_found:unknown|total_notes:unknown\n")
         
         logger.info(f"Debug log saved to: {self.log_file}")
         
