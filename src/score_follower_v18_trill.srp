@@ -43,6 +43,47 @@ def format_pitches_compact(pitches):
         result = result + "," + str(pitches[i])
     return result
 
+def format_pitch_array_string(pitches):
+    // Convert pitch array to human-readable string for debugging
+    if not pitches or len(pitches) == 0:
+        return "[]"
+    var result = "[" + str(pitches[0])
+    for i = 1 to len(pitches):
+        result = result + "," + str(pitches[i])
+    return result + "]"
+
+def generate_match_explanation(pitch, match_type, score_gained, timing_info, musical_context):
+    // Generate comprehensive explanation for why a note matched
+    var explanation = ""
+    if match_type == "chord_matched":
+        explanation = "Chord note " + str(pitch) + " matched - part of expected chord, gained " + str(score_gained) + " points"
+    elif match_type == "trill_matched":
+        explanation = "Trill note " + str(pitch) + " matched - ornament continuation, gained " + str(score_gained) + " points"
+    elif match_type == "grace_matched":
+        explanation = "Grace note " + str(pitch) + " matched - ornamental decoration, gained " + str(score_gained) + " points"
+    elif match_type == "chord_ignored":
+        explanation = "Chord note " + str(pitch) + " ignored - in ignore list, no score change"
+    else:
+        explanation = "Note " + str(pitch) + " matched with type " + str(match_type) + ", score change " + str(score_gained)
+    
+    return explanation + " | Timing: " + str(timing_info) + " | Context: " + str(musical_context)
+
+def generate_no_match_explanation(pitch, reason, constraint_type, timing_details, expected_context):
+    // Generate comprehensive explanation for why a note did not match
+    var explanation = ""
+    if reason == "extra_note":
+        explanation = "Note " + str(pitch) + " is extra - not in expected chord or ornaments"
+    elif reason == "timing_constraint":
+        explanation = "Note " + str(pitch) + " failed timing constraint - IOI too large for " + str(constraint_type)
+    elif reason == "already_used":
+        explanation = "Note " + str(pitch) + " already matched in this score event"
+    elif reason == "grace_after_chord":
+        explanation = "Grace note " + str(pitch) + " too late - chord notes already matched"
+    else:
+        explanation = "Note " + str(pitch) + " no match: " + str(reason)
+    
+    return explanation + " | Constraint: " + str(constraint_type) + " | Timing: " + str(timing_details) + " | Expected: " + str(expected_context)
+
 def log_dp_decision(col, row, pitch, time, vert_rule, horiz_rule, final_val, match_flag, used_pitches, unused_count):
     // Log a dynamic programming decision in readable format
     if LOG_DEBUG:
@@ -117,8 +158,12 @@ def log_ornament_processing(pitch, orn_type, trill_pitches, grace_pitches, ignor
         var tr_str = format_pitches_compact(trill_pitches if trill_pitches else [])
         var gr_str = format_pitches_compact(grace_pitches if grace_pitches else [])
         var ig_str = format_pitches_compact(ignore_pitches if ignore_pitches else [])
+        var tr_str_readable = format_pitch_array_string(trill_pitches if trill_pitches else [])
+        var gr_str_readable = format_pitch_array_string(grace_pitches if grace_pitches else [])
+        var ig_str_readable = format_pitch_array_string(ignore_pitches if ignore_pitches else [])
         debug_log("ORNAMENT|pitch:" + str(pitch) + "|ornament_type:" + str(orn_type) + "|trill_pitches:[" + tr_str + 
-                 "]|grace_pitches:[" + gr_str + "]|ignore_pitches:[" + ig_str + "]|credit_applied:" + str(credit_applied))
+                 "]|grace_pitches:[" + gr_str + "]|ignore_pitches:[" + ig_str + "]|credit_applied:" + str(credit_applied) +
+                 "|trill_str:" + tr_str_readable + "|grace_str:" + gr_str_readable + "|ignore_str:" + ig_str_readable)
 
 def log_window_movement(old_center, new_center, old_start, new_start, old_end, new_end, reason):
     if LOG_DEBUG:
@@ -133,7 +178,35 @@ def log_cevent_summary(row, cevent):
             if cevent.ornaments.grace_pitches: ornament_count = ornament_count + len(cevent.ornaments.grace_pitches)
             if cevent.ornaments.ignore_pitches: ornament_count = ornament_count + len(cevent.ornaments.ignore_pitches)
         debug_log("CEVENT|row:" + str(row) + "|score_time:" + str(cevent.time) + "|pitch_count:" + str(len(cevent.pitches)) + 
-                 "|time_span:" + str(cevent.time_span) + "|ornament_count:" + str(ornament_count) + "|expected:" + str(cevent.expected))
+                 "|time_span:" + str(cevent.time_span) + "|ornament_count:" + str(ornament_count) + "|expected:" + str(cevent.expected) +
+                 "|pitches_str:" + format_pitch_array_string(cevent.pitches))
+
+// Human-readable explanation logging functions
+def log_match_explanation(pitch, reason, score, timing, context):
+    if LOG_DEBUG:
+        debug_log("MATCH_EXPLAIN|pitch:" + str(pitch) + "|reason:" + str(reason) + 
+                 "|score:" + str(score) + "|timing:" + str(timing) + "|context:" + str(context))
+
+def log_no_match_explanation(pitch, reason, constraint, timing, expected):
+    if LOG_DEBUG:
+        debug_log("NO_MATCH_EXPLAIN|pitch:" + str(pitch) + "|reason:" + str(reason) + 
+                 "|constraint:" + str(constraint) + "|timing:" + str(timing) + "|expected:" + str(expected))
+
+def log_decision_explanation(row, pitch, reasoning, vertical_score, horizontal_score, winner, confidence):
+    if LOG_DEBUG:
+        debug_log("DECISION_EXPLAIN|row:" + str(row) + "|pitch:" + str(pitch) + "|reasoning:" + str(reasoning) + 
+                 "|vertical_score:" + str(vertical_score) + "|horizontal_score:" + str(horizontal_score) + 
+                 "|winner:" + str(winner) + "|confidence:" + str(confidence))
+
+def log_timing_explanation(pitch, ioi, limit, pass_status, reason, context):
+    if LOG_DEBUG:
+        debug_log("TIMING_EXPLAIN|pitch:" + str(pitch) + "|ioi:" + str(ioi) + "|limit:" + str(limit) + 
+                 "|pass:" + str(pass_status) + "|reason:" + str(reason) + "|context:" + str(context))
+
+def log_ornament_explanation(pitch, orn_type, processing, credit, pitches_context):
+    if LOG_DEBUG:
+        debug_log("ORNAMENT_EXPLAIN|pitch:" + str(pitch) + "|type:" + str(orn_type) + "|processing:" + str(processing) + 
+                 "|credit:" + str(credit) + "|pitches_context:" + str(pitches_context))
 
 def init_debug_log():
     if LOG_DEBUG:
@@ -1490,10 +1563,17 @@ class Score_follower:
                 match = true
                 // new_time is already correct
                 
-                // Log chord match analysis
+                // Log chord match analysis with explanation
                 log_timing_check(prev.time, time, ioi, timing_span, timing_limit, timing_ok, "chord")
                 log_ornament_processing(pitch, match_type, nil, nil, 
                                       (orn.ignore_pitches if orn else nil), (dmc if not is_ignored else 0))
+                
+                // Add detailed explanation for chord match  
+                var chord_pitches_str = format_pitch_array_string(cur_cevt.pitches)
+                var timing_info = "IOI=" + str(ioi) + ",limit=" + str(timing_limit) + ",span=" + str(timing_span)
+                var context = "Chord=" + chord_pitches_str + ",Used=" + format_pitch_array_string(prev.used) + ",Score=" + str(v)
+                var explanation = generate_match_explanation(pitch, match_type, (v - prev.value), timing_info, context)
+                log_match_explanation(pitch, explanation, v, time, context)
             elif (cur_cevt.ornaments and cur_cevt.ornaments.trill_pitches and
                   (pitch in cur_cevt.ornaments.trill_pitches) and
                   ((len(prev.used) == 0) or
@@ -1557,6 +1637,15 @@ class Score_follower:
                 // used is already 0
                 new_time = prev.time  // chord time is unchanged
                 
+                // Add detailed explanation for extra note
+                var chord_pitches_str = format_pitch_array_string(cur_cevt.pitches)
+                var trill_pitches_str = format_pitch_array_string(cur_cevt.ornaments.trill_pitches if cur_cevt.ornaments else [])
+                var grace_pitches_str = format_pitch_array_string(cur_cevt.ornaments.grace_pitches if cur_cevt.ornaments else [])
+                var timing_info = "IOI=" + str(ioi) + ",timing_ok=" + str(timing_ok)
+                var expected_context = "Chord=" + chord_pitches_str + ",Trills=" + trill_pitches_str + ",Grace=" + grace_pitches_str
+                var explanation = generate_no_match_explanation(pitch, "extra_note", "not_in_expected", timing_info, expected_context)
+                log_no_match_explanation(pitch, explanation, "not_in_expected", ioi, expected_context)
+                
             // Log comprehensive match type analysis before decision  
             var is_ignored_type = (match_type == "ignored_note" or match_type == "repeated_note")
             log_match_type_analysis(pitch, is_chord, is_trill, is_grace, (match_type == "extra_note"), 
@@ -1576,8 +1665,17 @@ class Score_follower:
                 if match:
                     cur.used.append(pitch)
             
-            // Log detailed cell decision
+            // Log detailed cell decision with explanation
             log_cell_decision(rk, vertical_value, v, winner, cell_updated, cur.value, match_type)
+            
+            // Add comprehensive decision explanation
+            var confidence = abs(v - vertical_value) / max(abs(v), abs(vertical_value), 1)
+            var reasoning = ""
+            if horizontal_wins:
+                reasoning = "Horizontal rule won: " + match_type + " processing gave better score (" + str(v) + " vs " + str(vertical_value) + ")"
+            else:
+                reasoning = "Vertical rule won: skipping score event was better (" + str(vertical_value) + " vs " + str(v) + ")"
+            log_decision_explanation(rk, pitch, reasoning, vertical_value, v, winner, confidence)
             
             // Log detailed horizontal rule analysis
             log_horizontal_rule(rk, prev.value, pitch, ioi, timing_limit, timing_ok, match_type, v)
@@ -1628,12 +1726,30 @@ class Score_follower:
 
         mm.got_result(result)
         
-        // Log match result
+        // Log match result with explanations
         if LOG_DEBUG:
             if result.isa_match():
                 debug_log("MATCH|row:" + str(top_row) + "|pitch:" + str(pitch) + "|perf_time:" + str(time) + "|score:" + str(top_score))
+                
+                // Generate comprehensive match explanation
+                var cevent_pitches_str = format_pitch_array_string(ref_track[top_row - 1].pitches) if top_row > 0 else "[]"
+                var timing_info = "IOI=" + str(time - last_event_time) if last_event_time >= 0 else "first_note"
+                var context = "Score_row=" + str(top_row) + ",Expected_pitches=" + cevent_pitches_str + ",Score_time=" + str(ref_track[top_row - 1].time) if top_row > 0 else "unknown"
+                var match_explanation = generate_match_explanation(pitch, "successful_match", top_score, timing_info, context)
+                log_match_explanation(pitch, match_explanation, top_score, time, context)
+                
             else:
                 debug_log("NO_MATCH|pitch:" + str(pitch) + "|perf_time:" + str(time))
+                
+                // Generate comprehensive no-match explanation  
+                var window_info = "Window=[" + str(mm.win_start) + "-" + str(mm.win_end) + "],Center=" + str(mm.win_center)
+                var expected_pitches = ""
+                if mm.win_center > 0 and mm.win_center <= len(ref_track):
+                    expected_pitches = format_pitch_array_string(ref_track[mm.win_center - 1].pitches)
+                var timing_constraint = "None_in_window"
+                var expected_context = window_info + ",Expected=" + expected_pitches
+                var no_match_explanation = generate_no_match_explanation(pitch, "no_match_in_window", timing_constraint, time, expected_context)
+                log_no_match_explanation(pitch, no_match_explanation, timing_constraint, time, expected_context)
 
         // print "dynamic_match: match_stime", result.match_stime, "pos",
         // print     result.pos, "matches", result.matches

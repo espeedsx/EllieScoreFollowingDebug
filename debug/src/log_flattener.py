@@ -28,24 +28,46 @@ logger = setup_logging(__name__)
 class FlattenedLogEntry:
     """Complete flattened representation of a DP decision with all context.
     
-    Fields are ordered to match the actual algorithm execution flow for optimal debugging:
+    Fields are ordered to prioritize immediate outcome visibility for debugging:
     
-    SECTION 1: INPUT CONTEXT (Columns 1-3) - What triggered this analysis?
-    SECTION 2: ALGORITHM STATE (Columns 4-5) - Current DP state and target
-    SECTION 3: DP COMPUTATION (Columns 6-9) - Core algorithm execution  
-    SECTION 4: MUSICAL ANALYSIS (Columns 10-12) - Musical context evaluation
-    SECTION 5: FINAL RESULT (Columns 13-14) - Match/no-match outcome
-    SECTION 6: DEBUGGING CONTEXT (Columns 15-17) - Analysis and diagnostics
+    SECTION 1: INPUT CONTEXT & OUTCOME (Columns 1-5) - What triggered this and what happened?
+    SECTION 2: ALGORITHM STATE (Columns 6-8) - Current DP state and target  
+    SECTION 3: DP COMPUTATION (Columns 9-12) - Core algorithm execution
+    SECTION 4: MUSICAL ANALYSIS (Columns 13-15) - Musical context evaluation
+    SECTION 5: ALGORITHM RESULT (Columns 16-17) - Final DP computation
+    SECTION 6: DEBUGGING CONTEXT (Columns 18-19) - Analysis and diagnostics
     """
     
-    # SECTION 1: INPUT CONTEXT - What performance note triggered this analysis?
+    # SECTION 1: INPUT CONTEXT & OUTCOME - What performance note triggered this and what was the result?
     
     # 1. INPUT GROUP - Performance note that triggered DP analysis
     input_column: int = 0
     input_pitch: int = 0
     input_perf_time: float = 0.0
     
-    # 2. MATRIX GROUP - Algorithm state: where is the search window?
+    # 2. MATCH GROUP - Match details (populated only if successful) - MOVED UP FOR VISIBILITY
+    match_row: int = 0
+    match_pitch: int = 0
+    match_perf_time: float = 0.0
+    match_score: float = 0.0
+    
+    # 3. NO_MATCH GROUP - No-match details (populated only if failed) - MOVED UP FOR VISIBILITY  
+    no_match_pitch: int = 0
+    no_match_perf_time: float = 0.0
+    
+    # 4. RESULT GROUP - Final classification of this INPUT block - MOVED UP FOR VISIBILITY
+    result_type: str = ""  # "match", "no_match", "unprocessed"
+    
+    # 5. EXPLANATION GROUP - Human-readable decision explanations - NEW SECTION
+    match_explanation: str = ""        # Clear explanation of why this was a match
+    no_match_explanation: str = ""     # Clear explanation of why this was not a match
+    decision_explanation: str = ""     # Detailed reasoning with supporting numbers
+    timing_explanation: str = ""       # Timing constraint explanation
+    ornament_explanation: str = ""     # Ornament processing explanation
+    
+    # SECTION 2: ALGORITHM STATE - Current DP state and target
+    
+    # 6. MATRIX GROUP - Algorithm state: where is the search window?
     matrix_window_start: int = 0
     matrix_window_end: int = 0
     matrix_window_center: int = 0
@@ -54,30 +76,31 @@ class FlattenedLogEntry:
     matrix_current_upper: int = 0
     matrix_prev_upper: int = 0
     
-    # 3. CEVENT GROUP - Target score event being evaluated
+    # 7. CEVENT GROUP - Target score event being evaluated
     cevent_row: int = 0
     cevent_score_time: float = 0.0
     cevent_pitch_count: int = 0
     cevent_time_span: float = 0.0
     cevent_ornament_count: int = 0
     cevent_expected: int = 0
+    cevent_pitches_str: str = ""       # NEW: String representation of pitches array
     
-    # SECTION 2: DP COMPUTATION - Core algorithm execution in order
-    
-    # 4. CELL GROUP - Previous DP cell state (starting point)
+    # 8. CELL GROUP - Previous DP cell state (starting point)
     cell_time: float = -1.0
     cell_value: float = 0.0
     cell_used_pitches: str = ""
     cell_unused_count: int = 0
     cell_score_time: float = 0.0
     
-    # 5. VRULE GROUP - Vertical rule: cost of skipping score event (applied first)
+    # SECTION 3: DP COMPUTATION - Core algorithm execution in order
+    
+    # 9. VRULE GROUP - Vertical rule: cost of skipping score event (applied first)
     vrule_up_value: float = 0.0
     vrule_penalty: float = 0.0
     vrule_result: float = 0.0
     vrule_start_point: str = ""
     
-    # 6. TIMING GROUP - Timing constraint validation (critical for horizontal rule)
+    # 10. TIMING GROUP - Timing constraint validation (critical for horizontal rule)
     timing_prev_cell_time: float = -1.0
     timing_curr_perf_time: float = 0.0
     timing_ioi: float = 0.0
@@ -86,7 +109,7 @@ class FlattenedLogEntry:
     timing_pass: str = ""
     timing_constraint_type: str = ""
     
-    # 7. HRULE GROUP - Horizontal rule: performance note matching logic
+    # 11. HRULE GROUP - Horizontal rule: performance note matching logic
     hrule_prev_value: float = 0.0
     hrule_ioi: float = 0.0
     hrule_limit: float = 0.0
@@ -94,9 +117,17 @@ class FlattenedLogEntry:
     hrule_match_type: str = ""
     hrule_result: float = 0.0
     
-    # SECTION 3: MUSICAL ANALYSIS - Musical context and ornament processing
+    # 12. DECISION GROUP - Final DP cell decision (vrule vs hrule winner)
+    decision_vertical_result: float = 0.0
+    decision_horizontal_result: float = 0.0
+    decision_winner: str = ""
+    decision_updated: str = ""
+    decision_final_value: float = 0.0
+    decision_reason: str = ""
     
-    # 8. MATCHTYPE GROUP - Musical context classification (what type of match?)
+    # SECTION 4: MUSICAL ANALYSIS - Musical context and ornament processing
+    
+    # 13. MATCHTYPE GROUP - Musical context classification (what type of match?)
     matchtype_is_chord: str = ""
     matchtype_is_trill: str = ""
     matchtype_is_grace: str = ""
@@ -106,24 +137,21 @@ class FlattenedLogEntry:
     matchtype_timing_ok: str = ""
     matchtype_ornament_info: str = ""
     
-    # 9. ORNAMENT GROUP - Ornament-specific processing details
+    # 14. ORNAMENT GROUP - Ornament-specific processing details
     ornament_type: str = ""
     ornament_trill_pitches: str = ""
     ornament_grace_pitches: str = ""
     ornament_ignore_pitches: str = ""
     ornament_credit_applied: float = 0.0
     
-    # 10. DECISION GROUP - Final DP cell decision (vrule vs hrule winner)
-    decision_vertical_result: float = 0.0
-    decision_horizontal_result: float = 0.0
-    decision_winner: str = ""
-    decision_updated: str = ""
-    decision_final_value: float = 0.0
-    decision_reason: str = ""
+    # 15. ORNAMENT_ARRAYS GROUP - String representations of ornament data - NEW
+    ornament_trill_pitches_str: str = ""     # Comma-separated trill pitches
+    ornament_grace_pitches_str: str = ""     # Comma-separated grace pitches  
+    ornament_ignore_pitches_str: str = ""    # Comma-separated ignore pitches
     
-    # SECTION 4: ALGORITHM RESULT - Final DP computation and outcomes
+    # SECTION 5: ALGORITHM RESULT - Final DP computation and outcomes
     
-    # 11. DP GROUP - Summary of DP computation for this cell
+    # 16. DP GROUP - Summary of DP computation for this cell
     dp_row: int = 0
     dp_vertical_rule: float = 0.0
     dp_horizontal_rule: float = 0.0
@@ -132,36 +160,21 @@ class FlattenedLogEntry:
     dp_used_pitches: str = ""
     dp_unused_count: int = 0
     
-    # 12. SCORE GROUP - How does this cell compete globally?
+    # 17. SCORE GROUP - How does this cell compete globally?
     score_current_score: float = 0.0
     score_top_score: float = 0.0
     score_beats_top: str = ""
     score_margin: float = 0.0
     score_confidence: float = 0.0
     
-    # SECTION 5: FINAL OUTCOME - Overall INPUT block result
-    
-    # 13. RESULT GROUP - Final classification of this INPUT block
-    result_type: str = ""  # "match", "no_match", "unprocessed"
-    
-    # 14. MATCH GROUP - Match details (populated only if successful)
-    match_row: int = 0
-    match_pitch: int = 0
-    match_perf_time: float = 0.0
-    match_score: float = 0.0
-    
-    # 15. NO_MATCH GROUP - No-match details (populated only if failed)
-    no_match_pitch: int = 0
-    no_match_perf_time: float = 0.0
-    
     # SECTION 6: DEBUGGING CONTEXT - Analysis and diagnostics
     
-    # 16. ARRAY GROUP - DP matrix neighborhood for validation
+    # 18. ARRAY GROUP - DP matrix neighborhood for validation
     array_center_value: float = 0.0
     array_neighbor_values: str = ""
     array_neighbor_positions: str = ""
     
-    # 17. BUG GROUP - Algorithm bug detection and systematic issues
+    # 19. BUG GROUP - Algorithm bug detection and systematic issues
     bug_has_timing_bug: bool = False
     bug_description: str = ""
 
@@ -286,7 +299,9 @@ class LogFlattener:
                 dp_entries[row]['dp'] = data
             elif log_type in ['cevent_summary', 'cell_state', 'vertical_rule', 'horizontal_rule', 
                               'timing_check', 'match_type', 'cell_decision', 'score_competition',
-                              'ornament_processing', 'matrix_state', 'array_neighborhood']:
+                              'ornament_processing', 'matrix_state', 'array_neighborhood',
+                              'match_explanation', 'no_match_explanation', 'decision_explanation', 
+                              'timing_explanation', 'ornament_explanation']:
                 # Store by row if it has row info, otherwise apply to all
                 if 'row' in data:
                     row = data['row']
@@ -404,7 +419,7 @@ class LogFlattener:
             }
         
         elif log_type == 'cevent_summary':
-            row, score_time, pitch_count, time_span, ornament_count, expected = groups
+            row, score_time, pitch_count, time_span, ornament_count, expected, pitches_str = groups
             return {
                 'row': int(row),
                 'cevent_row': int(row),
@@ -412,7 +427,8 @@ class LogFlattener:
                 'cevent_pitch_count': int(pitch_count),
                 'cevent_time_span': float(time_span),
                 'cevent_ornament_count': int(ornament_count),
-                'cevent_expected': int(expected)
+                'cevent_expected': int(expected),
+                'cevent_pitches_str': pitches_str
             }
         
         elif log_type == 'cell_state':
@@ -499,13 +515,16 @@ class LogFlattener:
             }
         
         elif log_type == 'ornament_processing':
-            pitch, ornament_type, trill_pitches, grace_pitches, ignore_pitches, credit_applied = groups
+            pitch, ornament_type, trill_pitches, grace_pitches, ignore_pitches, credit_applied, trill_str, grace_str, ignore_str = groups
             return {
                 'ornament_type': ornament_type,
                 'ornament_trill_pitches': trill_pitches,
                 'ornament_grace_pitches': grace_pitches,
                 'ornament_ignore_pitches': ignore_pitches,
-                'ornament_credit_applied': float(credit_applied)
+                'ornament_credit_applied': float(credit_applied),
+                'ornament_trill_pitches_str': trill_str,
+                'ornament_grace_pitches_str': grace_str,
+                'ornament_ignore_pitches_str': ignore_str
             }
         
         elif log_type == 'matrix_state':
@@ -527,6 +546,36 @@ class LogFlattener:
                 'array_center_value': float(center_value),
                 'array_neighbor_values': values,
                 'array_neighbor_positions': positions
+            }
+        
+        elif log_type == 'match_explanation':
+            pitch, reason, score, timing, context = groups
+            return {
+                'match_explanation': f"Pitch {pitch} matched: {reason} (score={score}, timing={timing}, context={context})"
+            }
+        
+        elif log_type == 'no_match_explanation':
+            pitch, reason, constraint, timing, expected = groups
+            return {
+                'no_match_explanation': f"Pitch {pitch} no match: {reason} (constraint={constraint}, timing={timing}, expected={expected})"
+            }
+        
+        elif log_type == 'decision_explanation':
+            row, pitch, reasoning, vertical_score, horizontal_score, winner, confidence = groups
+            return {
+                'decision_explanation': f"Row {row} pitch {pitch}: {reasoning} (vertical={vertical_score}, horizontal={horizontal_score}, winner={winner}, confidence={confidence})"
+            }
+        
+        elif log_type == 'timing_explanation':
+            pitch, ioi, limit, pass_status, reason, context = groups
+            return {
+                'timing_explanation': f"Pitch {pitch} timing: {reason} (IOI={ioi}, limit={limit}, pass={pass_status}, context={context})"
+            }
+        
+        elif log_type == 'ornament_explanation':
+            pitch, orn_type, processing, credit, pitches_context = groups
+            return {
+                'ornament_explanation': f"Pitch {pitch} ornament {orn_type}: {processing} (credit={credit}, context={pitches_context})"
             }
         
         # Default: return empty dict for unknown types
