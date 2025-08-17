@@ -6,6 +6,15 @@ python debug_workflow.py 743 --score-time 187.5
 
 -------------------------------------
 
+add the score following algorithm to claude.md so it is part of the context.
+
+I want to adjust how the blocks are outputted in the CSV file. I want to move the match and no match blocks towards the beginning of the CSV file. So after the input block, put match and no match block there. I need to know the outcome first before I debug into it.
+
+One other thing I want to instrument the score following algorithm so that it will be locked is the reason for the unmatch, the reason for the no match. So at some point in the algorithm, it's decided that it's not a match. So I want to instrument all the places where such decision is decision of match and no match is made. And I want to essentially output a human-readable explanation why it's a match or why it's not a match. So be clear about the reason of the outcome. Also include some of the numbers that can explain the decision of match and no match. So effectively, I want the explanation to be sort of self-sufficient so somebody can read the explanation and say, oh, that's the reason why this is matched or this is not matched. So yeah, I want you to look at all the places where the decision of match and no match is decided and then lock that decision right there. So in the end, I want the CSV file to clearly contain a column that explains the reason why it's matched or not matched.
+
+So where it's helpful, I also want you to try to print out the composite data types like array. For example, in C event, I want you to print out the list of nodes that are included in the composite event. The way you print it is essentially concatenate these nodes into a short stream and then create a new field to include this list of nodes. Because the list of nodes is very helpful in troubleshooting. Although this is a complex data type, but by essentially converting this complex data type into a string representation, essentially it's a list of nodes. It doesn't blow up the output that much, but it gives crucial information for debugging. So this one I want to do, but also look around and look at the other logging that you have where you think there's an opportunity to print out a list of things, for example. Do so, because if it helps with debugging.
+
+
 complete the task.
 
 did you output the comprehensive score following algorithm to debug\score_following_algorithm.md?

@@ -18,7 +18,8 @@ from config import (
     SERPENT_SRC_DIR, LOGS_DIR, SERPENT_EXECUTABLE, TEST_SCRIPT, TEST_TIMEOUT,
     get_log_filename
 )
-from utils import setup_logging, get_timestamp, format_duration
+from utils import setup_logging, get_timestamp, format_duration, log_with_line
+import logging
 
 
 logger = setup_logging(__name__)
@@ -114,6 +115,7 @@ class TestExecutor:
             
             logger.info(f"Working directory: {SERPENT_SRC_DIR}")
             logger.info(f"Timeout: {TEST_TIMEOUT} seconds")
+            log_with_line(logger, logging.INFO, f"Executing command: {' '.join(cmd)}", context=f"working_dir={SERPENT_SRC_DIR}")
             
             # Start process
             self.process = subprocess.Popen(
@@ -180,6 +182,8 @@ class TestExecutor:
             f.write("# Score Following Debug Log\n")
             f.write(f"# Test Case: {self.test_case_id}\n")
             f.write(f"# Timestamp: {self.timestamp}\n")
+            f.write(f"# Command: {metadata['command']}\n")
+            f.write(f"# Working Dir: {SERPENT_SRC_DIR}\n")
             f.write(f"# Duration: {format_duration(metadata['duration_seconds'])}\n")
             f.write(f"# Timeout: {result['timeout']}\n")
             f.write(f"# Return Code: {result['returncode']}\n")

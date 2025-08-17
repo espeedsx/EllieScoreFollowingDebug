@@ -24,7 +24,7 @@ REPORTS_DIR.mkdir(exist_ok=True)
 # Test execution settings
 SERPENT_EXECUTABLE = "serpent64"
 TEST_SCRIPT = "run_bench"
-TEST_TIMEOUT = 10   # seconds
+TEST_TIMEOUT = 20   # seconds
 
 # Debug log format
 DEBUG_LOG_PREFIX = "DP|"

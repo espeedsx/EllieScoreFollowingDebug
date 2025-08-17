@@ -1572,8 +1572,8 @@ class Score_follower:
                 var chord_pitches_str = format_pitch_array_string(cur_cevt.pitches)
                 var timing_info = "IOI=" + str(ioi) + ",limit=" + str(timing_limit) + ",span=" + str(timing_span)
                 var context = "Chord=" + chord_pitches_str + ",Used=" + format_pitch_array_string(prev.used) + ",Score=" + str(v)
-                var explanation = generate_match_explanation(pitch, match_type, (v - prev.value), timing_info, context)
-                log_match_explanation(pitch, explanation, v, time, context)
+                var chord_explanation = generate_match_explanation(pitch, match_type, (v - prev.value), timing_info, context)
+                log_match_explanation(pitch, chord_explanation, v, time, context)
             elif (cur_cevt.ornaments and cur_cevt.ornaments.trill_pitches and
                   (pitch in cur_cevt.ornaments.trill_pitches) and
                   ((len(prev.used) == 0) or
@@ -1638,13 +1638,13 @@ class Score_follower:
                 new_time = prev.time  // chord time is unchanged
                 
                 // Add detailed explanation for extra note
-                var chord_pitches_str = format_pitch_array_string(cur_cevt.pitches)
-                var trill_pitches_str = format_pitch_array_string(cur_cevt.ornaments.trill_pitches if cur_cevt.ornaments else [])
-                var grace_pitches_str = format_pitch_array_string(cur_cevt.ornaments.grace_pitches if cur_cevt.ornaments else [])
-                var timing_info = "IOI=" + str(ioi) + ",timing_ok=" + str(timing_ok)
-                var expected_context = "Chord=" + chord_pitches_str + ",Trills=" + trill_pitches_str + ",Grace=" + grace_pitches_str
-                var explanation = generate_no_match_explanation(pitch, "extra_note", "not_in_expected", timing_info, expected_context)
-                log_no_match_explanation(pitch, explanation, "not_in_expected", ioi, expected_context)
+                var extra_chord_pitches_str = format_pitch_array_string(cur_cevt.pitches)
+                var extra_trill_pitches_str = format_pitch_array_string(cur_cevt.ornaments.trill_pitches if cur_cevt.ornaments else [])
+                var extra_grace_pitches_str = format_pitch_array_string(cur_cevt.ornaments.grace_pitches if cur_cevt.ornaments else [])
+                var extra_timing_info = "IOI=" + str(ioi) + ",timing_ok=" + str(timing_ok)
+                var extra_expected_context = "Chord=" + extra_chord_pitches_str + ",Trills=" + extra_trill_pitches_str + ",Grace=" + extra_grace_pitches_str
+                var extra_explanation = generate_no_match_explanation(pitch, "extra_note", "not_in_expected", extra_timing_info, extra_expected_context)
+                log_no_match_explanation(pitch, extra_explanation, "not_in_expected", ioi, extra_expected_context)
                 
             // Log comprehensive match type analysis before decision  
             var is_ignored_type = (match_type == "ignored_note" or match_type == "repeated_note")
@@ -1669,13 +1669,13 @@ class Score_follower:
             log_cell_decision(rk, vertical_value, v, winner, cell_updated, cur.value, match_type)
             
             // Add comprehensive decision explanation
-            var confidence = abs(v - vertical_value) / max(abs(v), abs(vertical_value), 1)
-            var reasoning = ""
+            var decision_confidence = abs(v - vertical_value) / max(max(abs(v), abs(vertical_value)), 1)
+            var decision_reasoning = ""
             if horizontal_wins:
-                reasoning = "Horizontal rule won: " + match_type + " processing gave better score (" + str(v) + " vs " + str(vertical_value) + ")"
+                decision_reasoning = "Horizontal rule won: " + match_type + " processing gave better score (" + str(v) + " vs " + str(vertical_value) + ")"
             else:
-                reasoning = "Vertical rule won: skipping score event was better (" + str(vertical_value) + " vs " + str(v) + ")"
-            log_decision_explanation(rk, pitch, reasoning, vertical_value, v, winner, confidence)
+                decision_reasoning = "Vertical rule won: skipping score event was better (" + str(vertical_value) + " vs " + str(v) + ")"
+            log_decision_explanation(rk, pitch, decision_reasoning, vertical_value, v, winner, decision_confidence)
             
             // Log detailed horizontal rule analysis
             log_horizontal_rule(rk, prev.value, pitch, ioi, timing_limit, timing_ok, match_type, v)
@@ -1704,8 +1704,8 @@ class Score_follower:
             // Log score competition analysis
             var beats_top_score = (cur.value > top_score)
             var score_margin = cur.value - top_score
-            var confidence = cur.value / (top_score + 0.001)  // avoid division by zero
-            log_score_competition(rk, cur.value, top_score, beats_top_score, score_margin, confidence)
+            var score_confidence = cur.value / (top_score + 0.001)  // avoid division by zero
+            log_score_competition(rk, cur.value, top_score, beats_top_score, score_margin, score_confidence)
 
             // is the a reportable match?
             if cur.value > top_score and report:
@@ -1733,7 +1733,7 @@ class Score_follower:
                 
                 // Generate comprehensive match explanation
                 var cevent_pitches_str = format_pitch_array_string(ref_track[top_row - 1].pitches) if top_row > 0 else "[]"
-                var timing_info = "IOI=" + str(time - last_event_time) if last_event_time >= 0 else "first_note"
+                var timing_info = "IOI=" + str(time - last_evt_time) if last_evt_time >= 0 else "first_note"
                 var context = "Score_row=" + str(top_row) + ",Expected_pitches=" + cevent_pitches_str + ",Score_time=" + str(ref_track[top_row - 1].time) if top_row > 0 else "unknown"
                 var match_explanation = generate_match_explanation(pitch, "successful_match", top_score, timing_info, context)
                 log_match_explanation(pitch, match_explanation, top_score, time, context)

@@ -19,7 +19,7 @@ from collections import defaultdict
 from tqdm import tqdm
 
 from config import LOG_PATTERNS
-from utils import setup_logging
+from utils import setup_logging, log_with_line
 
 logger = setup_logging(__name__)
 
@@ -216,7 +216,8 @@ class LogFlattener:
                     try:
                         self._process_line(line, line_num)
                     except Exception as e:
-                        logger.warning(f"Error processing line {line_num}: {e}")
+                        # Log warning but continue processing - individual line failures shouldn't kill entire process
+                        log_with_line(logger, logging.WARNING, f"Error processing line {line_num}: {e}", context=f"line_content={line.strip()[:100]}")
                         continue
                     
                     pbar.update(1)
@@ -667,8 +668,9 @@ def main():
     
     log_file = Path(args.log_file)
     if not log_file.exists():
-        logger.error(f"Log file not found: {log_file}")
-        return 1
+        error_msg = f"Log file not found: {log_file}"
+        log_with_line(logger, logging.ERROR, error_msg)
+        raise FileNotFoundError(error_msg)
     
     output_file = Path(args.output) if args.output else log_file.with_suffix('.csv')
     
@@ -677,8 +679,9 @@ def main():
     entries = flattener.parse_log_file(log_file)
     
     if not entries:
-        logger.error("No entries found in log file")
-        return 1
+        error_msg = f"No entries found in log file: {log_file}"
+        log_with_line(logger, logging.ERROR, error_msg, context=f"file_size={log_file.stat().st_size if log_file.exists() else 'N/A'}")
+        raise RuntimeError(error_msg)
     
     # Write CSV
     flattener.write_csv(entries, output_file)

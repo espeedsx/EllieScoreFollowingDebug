@@ -28,6 +28,29 @@ def setup_logging(name: str, level: int = logging.INFO) -> logging.Logger:
     return logger
 
 
+def log_with_line(logger: logging.Logger, level: int, message: str, line_number: Optional[int] = None, context: Optional[str] = None) -> None:
+    """Enhanced logging with line number and context for better debugging."""
+    import inspect
+    
+    # Get caller information if line_number not provided
+    if line_number is None:
+        frame = inspect.currentframe().f_back
+        line_number = frame.f_lineno
+        filename = frame.f_code.co_filename
+        function_name = frame.f_code.co_name
+        caller_context = f"{Path(filename).name}:{function_name}:{line_number}"
+    else:
+        caller_context = f"line:{line_number}"
+    
+    # Format message with context
+    if context:
+        formatted_message = f"[{caller_context}] {message} | Context: {context}"
+    else:
+        formatted_message = f"[{caller_context}] {message}"
+    
+    logger.log(level, formatted_message)
+
+
 def parse_pitch_list(pitch_str: str) -> List[int]:
     """Parse a comma-separated pitch string into a list of integers."""
     if not pitch_str.strip():

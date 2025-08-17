@@ -12,7 +12,8 @@
       "Bash(mv:*)",
       "Bash(pip install:*)",
       "Bash(timeout:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(serpent64:*)"
     ],
     "deny": [],
     "additionalDirectories": [

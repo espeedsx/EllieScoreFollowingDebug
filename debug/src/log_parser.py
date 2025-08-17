@@ -628,12 +628,16 @@ def parse_log_file(log_file: Path, save_analysis: bool = True, parse_comprehensi
         
         # Second pass: parse comprehensive data only around failure lines
         if not failure_lines:
-            raise RuntimeError("No failure lines found - cannot perform targeted parsing without failures")
-            
-        logger.info(f"Second pass: parsing comprehensive data around {len(failure_lines)} target lines")
-        parser_comprehensive = LogParser(log_file, parse_comprehensive=True)
-        parser_comprehensive.target_lines = failure_lines  # Only parse these lines comprehensively
-        comprehensive_result = parser_comprehensive.parse()
+            logger.info("No failure lines found - test case appears successful")
+            # For successful cases, parse all comprehensive data
+            logger.info("Parsing all comprehensive data for successful test case")
+            parser_comprehensive = LogParser(log_file, parse_comprehensive=True)
+            comprehensive_result = parser_comprehensive.parse()
+        else:
+            logger.info(f"Second pass: parsing comprehensive data around {len(failure_lines)} target lines")
+            parser_comprehensive = LogParser(log_file, parse_comprehensive=True)
+            parser_comprehensive.target_lines = failure_lines  # Only parse these lines comprehensively
+            comprehensive_result = parser_comprehensive.parse()
         
         # Validate comprehensive data was extracted
         total_entries = sum(len(v) for v in comprehensive_result['comprehensive_data'].values())
