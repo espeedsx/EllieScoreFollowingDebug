@@ -13,13 +13,9 @@ SERPENT_SRC_DIR = ROOT_DIR / "src"  # This is the Serpent source directory
 
 # Log directories
 LOGS_DIR = DEBUG_DIR / "logs"
-ANALYSIS_DIR = DEBUG_DIR / "analysis" 
-REPORTS_DIR = DEBUG_DIR / "reports"
 
 # Ensure directories exist
 LOGS_DIR.mkdir(exist_ok=True)
-ANALYSIS_DIR.mkdir(exist_ok=True)
-REPORTS_DIR.mkdir(exist_ok=True)
 
 # Test execution settings
 SERPENT_EXECUTABLE = "serpent64"
@@ -41,10 +37,8 @@ DEBUG_FIELDS = [
     "uc"     # unused count
 ]
 
-# Analysis settings
-FAILURE_CONTEXT_WINDOW = 5  # decisions before failure to analyze
+# Log processing settings
 MAX_LOG_SIZE_MB = 10        # maximum log file size to process
-AI_ANALYSIS_MODEL = "claude-3-sonnet-20240229"
 
 # Readable log patterns
 LOG_PATTERNS = {
@@ -85,16 +79,3 @@ def get_log_filename(test_case_id, timestamp=None):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"test_{test_case_id}_{timestamp}.log"
 
-def get_analysis_filename(test_case_id, timestamp=None):
-    """Generate analysis filename for a test case."""
-    if timestamp is None:
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"analysis_{test_case_id}_{timestamp}.json"
-
-def get_report_filename(test_case_id, timestamp=None):
-    """Generate report filename for a test case."""
-    if timestamp is None:
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"report_{test_case_id}_{timestamp}.md"
