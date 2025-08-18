@@ -1,5 +1,32 @@
 # Score Following Debug Quick Reference
 
+## 📦 Setup and Installation
+
+### Prerequisites
+- **Python 3.8+** (tested with Python 3.12)
+- **serpent64** executable in system PATH
+  - Download from: https://www.cs.cmu.edu/~music/serpent/
+  - Verify: `serpent64 --version`
+
+### Install Dependencies
+```bash
+cd debug
+pip install -r requirements.txt
+```
+
+### Verify Installation
+```bash
+# Check Python packages
+python -c "import tqdm; print('tqdm version:', tqdm.__version__)"
+
+# Check Serpent is available
+serpent64 --version
+
+# Test debug system
+cd src
+python debug.py 1
+```
+
 ## 🚀 Essential Commands
 
 ### Primary Workflow - One-Command Log and CSV Generation
@@ -95,17 +122,42 @@ The flattened CSV contains 90+ columns organized into sections:
 
 ## 🚨 Troubleshooting
 
+### Installation Issues
+| Problem | Solution |
+|---------|----------|
+| `pip install` fails | Upgrade pip: `python -m pip install --upgrade pip` |
+| `tqdm` not found | Run: `pip install tqdm>=4.67.0` |
+| Import errors | Check Python version: `python --version` (need 3.8+) |
+| Permission denied | Use: `pip install --user -r requirements.txt` |
+
+### Runtime Issues
 | Problem | Solution |
 |---------|----------|
 | No debug output | Check: `serpent64 run_bench 1 1 -d` works |
 | Parse errors | Verify log format with `cat logs/test_1_*.log \| head` |
-| Serpent not found | Add serpent64 to PATH |
+| Serpent not found | Add serpent64 to PATH or install from serpent-lang.org |
 | Test hangs | Process killed after timeout (expected) |
 | CSV parsing fails | Check log file exists and has debug entries |
 | Missing explanations | Ensure `-d` flag generates MATCH_EXPLAIN/NO_MATCH_EXPLAIN entries |
+| Unicode errors | Use `chcp 65001` on Windows or upgrade to Python 3.8+ |
 
 ## ⚡ Quick Checks
 
+### System Verification
+```bash
+# Check Python and dependencies
+python --version                     # Should be 3.8+
+python -c "import tqdm; print('OK')" # Should print 'OK'
+
+# Check Serpent availability
+serpent64 --version                  # Should show Serpent version
+
+# Check requirements.txt
+cat requirements.txt                 # View dependencies
+pip list | grep tqdm                # Verify tqdm installed
+```
+
+### Log and CSV Verification
 ```bash
 # Check if test ran successfully
 ls -la logs/ | tail -5

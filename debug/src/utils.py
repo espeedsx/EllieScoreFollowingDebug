@@ -81,6 +81,9 @@ def find_latest_log(test_case_id: int) -> Path:
     pattern = f"test_{test_case_id}_*.log"
     log_files = list(LOGS_DIR.glob(pattern))
     
+    # Exclude temporary _serpent.log files
+    log_files = [f for f in log_files if not f.name.endswith('_serpent.log')]
+    
     if not log_files:
         raise FileNotFoundError(f"No log files found for test case {test_case_id} in {LOGS_DIR}")
     

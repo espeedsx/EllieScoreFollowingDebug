@@ -6,6 +6,13 @@ python debug_workflow.py 743 --score-time 187.5
 
 -------------------------------------
 
+
+I want to log where the final match / no-match decisions are made. only one case is populated. reference the debug\score_following_algorithm.md for the actual algorithm   
+
+
+
+
+
 add the score following algorithm to claude.md so it is part of the context.
 
 I want to adjust how the blocks are outputted in the CSV file. I want to move the match and no match blocks towards the beginning of the CSV file. So after the input block, put match and no match block there. I need to know the outcome first before I debug into it.

@@ -1,0 +1,40 @@
+# Score Following Debug System Requirements
+# Python 3.8+ required
+
+# INSTALLATION:
+# pip install -r requirements.txt
+
+# Core dependencies for log processing and CSV generation
+tqdm>=4.67.0              # Progress bars for log processing
+
+# Built-in Python modules used (no installation required):
+# - argparse    (command line argument parsing)
+# - collections (defaultdict for data structures)
+# - csv         (CSV file reading/writing)
+# - dataclasses (structured data classes)
+# - datetime    (timestamp handling)
+# - json        (JSON parsing/generation)
+# - logging     (debug and info logging)
+# - os          (operating system interface)
+# - pathlib     (path manipulation)
+# - re          (regular expressions for log parsing)
+# - signal      (process signal handling)
+# - subprocess  (external process execution)
+# - sys         (system-specific parameters)
+# - time        (time-related functions)
+# - typing      (type hints)
+
+# External tools required (must be installed separately):
+# - serpent64   (Serpent language interpreter)
+#   Available from: https://www.cs.cmu.edu/~music/serpent/
+#   Must be in system PATH for test execution
+
+# USAGE AFTER INSTALLATION:
+# cd debug/src
+# python debug.py 1                    # Generate log and CSV for test case 1
+# python debug.py 1 --quick           # Use existing log if available
+# python debug.py 1 --output my.csv   # Custom CSV output filename
+
+# SYSTEM VERIFICATION:
+# python -c "import tqdm; print('tqdm version:', tqdm.__version__)"
+# serpent64 --version
